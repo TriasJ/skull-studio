@@ -37,8 +37,8 @@ ocr = ["mineru[core]"]
 skull-studio = "skull_studio.studio:main"
 
 [project.urls]
-Homepage = "https://github.com/your-username/skull-studio"
-Issues = "https://github.com/your-username/skull-studio/issues"
+Homepage = "https://github.com/TriasJ/skull-studio"
+Issues = "https://github.com/TriasJ/skull-studio/issues"
 
 [tool.setuptools]
 packages = ["skull_studio"]

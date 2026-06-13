@@ -29,7 +29,7 @@ use), and export back to PowerPoint or self-contained video/GIF slideshows.
 ## Quick start
 
 ```bash
-git clone https://github.com/your-username/skull-studio.git
+git clone https://github.com/TriasJ/skull-studio.git
 cd skull-studio
 python install.py            # checks deps, installs the package, vendors PixiJS/GSAP
 skull-studio                 # launches the editor in your browser
