@@ -9,6 +9,18 @@ use), and export back to PowerPoint or self-contained video/GIF slideshows.
 [Quick start](#-quick-start) · [Features](#-feature-tour) · [Exports](#-export-formats) ·
 [Usage guide](docs/USAGE.md) · [Architecture](docs/ARCHITECTURE.md) · [Troubleshooting](docs/TROUBLESHOOTING.md)
 
+<br>
+
+<img src="docs/images/demo.gif" alt="A slide's elements blurring into focus and animating into place" width="80%">
+
+<sub><i>Staggered entrances on the bundled sample deck — elements lift off a cleaned background and animate into place.</i></sub>
+
+<br><br>
+
+<img src="docs/images/editor.png" alt="The Skull Studio in-browser editor" width="90%">
+
+<sub><i>The in-browser editor: element list with thumbnails, the live PixiJS canvas, and the per-element inspector (entrance, idle, rig, blend, parallax).</i></sub>
+
 </div>
 
 > [!WARNING]
