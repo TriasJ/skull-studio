@@ -1,0 +1,269 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>{{TITLE}}</title>
+<style>
+  html, body { margin: 0; padding: 0; width: 100%; height: 100%; background: #000; overflow: hidden; }
+  canvas { position: fixed; inset: 0; display: block; }
+  #boot-spinner {
+    position: fixed; inset: 0; display: flex; align-items: center; justify-content: center;
+    color: #c9a227; font: 14px/1.4 system-ui, sans-serif; letter-spacing: 0.2em; z-index: 10;
+    transition: opacity 0.4s; pointer-events: none;
+  }
+  #boot-spinner::after {
+    content: ""; width: 28px; height: 28px; margin-left: 14px; border-radius: 50%;
+    border: 2px solid #c9a22744; border-top-color: #c9a227; animation: spin 0.9s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+</style>
+<!-- EDITOR:CSS:START -->
+<style>
+  /* ---------- Editor ---------- */
+  #skull-editor {
+    display: none; position: fixed; inset: 0; z-index: 20; pointer-events: none;
+    font: 12px/1.45 system-ui, sans-serif; color: #ddd;
+    --panel: #16161add; --edge: #333; --hi: #c9a227;
+  }
+  #skull-editor.open { display: block; }
+  #skull-editor .panel {
+    position: absolute; background: var(--panel); border: 1px solid var(--edge);
+    border-radius: 8px; pointer-events: auto; backdrop-filter: blur(6px); overflow: hidden;
+  }
+  #ed-top { top: 10px; left: 50%; transform: translateX(-50%); padding: 6px 10px; display: flex; gap: 6px; align-items: center; flex-wrap: wrap; max-width: 60vw; }
+  .studio-only { display: none !important; }
+  #skull-editor.studio .studio-only { display: inline-block !important; }
+  #skull-editor.studio #ed-menubar { display: flex; }
+  /* menu bar (studio) */
+  #skull-editor #ed-menubar { position: absolute; top: 10px; left: 10px; display: none; gap: 2px; padding: 2px 6px; overflow: visible; z-index: 35; }
+  #ed-menubar.studio { display: flex; }
+  #ed-menubar details { position: relative; }
+  #ed-menubar summary { list-style: none; cursor: pointer; padding: 5px 10px; border-radius: 5px; color: #ccc; user-select: none; }
+  #ed-menubar summary::-webkit-details-marker { display: none; }
+  #ed-menubar details[open] summary, #ed-menubar summary:hover { background: #2c2614; color: var(--hi); }
+  #ed-menubar .dd { position: absolute; top: 100%; left: 0; min-width: 230px; background: #1b1b20; border: 1px solid var(--edge); border-radius: 6px; padding: 4px; z-index: 30; box-shadow: 0 8px 24px #000a; }
+  #ed-menubar .dd button { display: block; width: 100%; text-align: left; background: none; border: none; padding: 6px 10px; border-radius: 4px; }
+  #ed-menubar .dd button:hover { background: #2c2614; }
+  #ed-menubar .dd hr { border: none; border-top: 1px solid #2c2c33; margin: 4px 2px; }
+  #ed-menubar .dd .kbd { float: right; color: #777; font-size: 10px; }
+  #ed-menubar .tool.on { background: #3a3320; color: var(--hi); }
+  /* modals (options, pptx export) */
+  #ed-options, .ed-modal { position: fixed; inset: 0; display: none; align-items: center; justify-content: center; background: #0008; z-index: 40; pointer-events: auto; }
+  #ed-options.open, .ed-modal.open { display: flex; }
+  #ed-options .box, .ed-modal .box { background: #1b1b20; border: 1px solid var(--edge); border-radius: 10px; padding: 18px 20px; width: 340px; }
+  #ed-options h3, .ed-modal h3 { margin: 0 0 10px; color: var(--hi); font-size: 14px; }
+  #brz-list .brz-item { padding: 5px 9px; cursor: pointer; border-bottom: 1px solid #1c1c22; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  #brz-list .brz-item:hover { background: #222; }
+  #brz-list .brz-item.sel { background: #2c2614; color: var(--hi); }
+  #brz-list .brz-dir::before { content: "\1F4C1\00a0"; }
+  #brz-list .brz-file::before { content: "\1F4C4\00a0"; }
+  #ed-left { top: 60px; left: 10px; bottom: 12px; width: 200px; overflow-y: auto; }
+  #ed-right { top: 60px; right: 10px; width: 250px; bottom: 12px; overflow-y: auto; padding: 10px; }
+  #skull-editor.rig-open #ed-left, #skull-editor.rig-open #ed-right { bottom: 180px; }
+  #ed-bottom { left: 220px; right: 270px; bottom: 10px; height: 158px; padding: 6px 10px; display: none; flex-direction: column; }
+  #ed-bottom.open { display: flex; }
+  #ed-rig-toolbar { flex-wrap: wrap; flex: 0 0 auto; row-gap: 4px; }
+  .ed-seg { display: inline-flex; border: 1px solid var(--edge); border-radius: 6px; overflow: hidden; }
+  .ed-seg .seg-btn { border: none; border-radius: 0; margin: 0; background: #1a1a1f; padding: 5px 11px; }
+  .ed-seg .seg-btn.on { background: var(--hi); color: #111; }
+  .ed-rec { color: #ff5c5c; font-size: 11px; font-weight: 600; letter-spacing: 0.04em; min-width: 84px; }
+  .ed-rig-hint { font-size: 11px; color: #8a8475; padding: 3px 2px; flex: 0 0 auto; }
+  #ed-rig-toolbar button { padding: 4px 8px; }
+  /* position:static overrides the global `canvas{position:fixed;inset:0}` (Pixi) rule */
+  #ed-timeline-canvas { position: static; inset: auto; width: 100%; flex: 1 1 auto; min-height: 44px; background: #101014; border: 1px solid var(--edge); border-radius: 4px; display: block; cursor: crosshair; }
+  /* rig panel extras */
+  .ed-sub { font-size: 10px; color: #777; text-transform: uppercase; letter-spacing: 0.08em; margin: 8px 0 3px; }
+  .ed-preset-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; }
+  .ed-preset { text-align: left; }
+  #ed-density button { flex: 1; }
+  #ed-density button.on { background: #3a3320; border-color: var(--hi); color: var(--hi); }
+  .ed-legend { display: flex; flex-direction: column; gap: 3px; margin-top: 8px; font-size: 11px; color: #aaa; }
+  .ed-legend .pin { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 6px; vertical-align: -1px; }
+  .ed-legend .pin.gold { background: #c9a227; }
+  .ed-legend .pin.gray { background: #999; }
+  .ed-legend .pin.sel { background: #999; box-shadow: 0 0 0 2px #fff; }
+  /* help modal */
+  #ed-help { position: fixed; inset: 0; display: none; align-items: center; justify-content: center; background: #0009; z-index: 45; pointer-events: auto; }
+  #ed-help.open { display: flex; }
+  #ed-help .box { background: #1b1b20; border: 1px solid var(--edge); border-radius: 10px; padding: 18px 22px; width: 560px; max-height: 80vh; overflow-y: auto; }
+  #ed-help h3 { margin: 0 0 8px; color: var(--hi); font-size: 15px; }
+  #ed-help h4 { margin: 12px 0 4px; }
+  #ed-help td { padding: 2px 12px 2px 0; vertical-align: top; }
+  #ed-help kbd { background: #26262c; border: 1px solid #444; border-radius: 4px; padding: 1px 6px; font: 11px monospace; }
+  #skull-editor h4 { margin: 8px 0 4px; font-size: 11px; text-transform: uppercase; letter-spacing: 0.1em; color: #999; }
+  .ed-sec { margin: 4px 0; border-bottom: 1px solid #222; padding-bottom: 4px; }
+  .ed-sec summary { cursor: pointer; user-select: none; list-style: none; padding: 4px 0;
+    font-size: 11px; text-transform: uppercase; letter-spacing: 0.1em; color: #999; }
+  .ed-sec summary::-webkit-details-marker { display: none; }
+  .ed-sec summary::before { content: "\25B8\00a0"; color: #666; }
+  .ed-sec[open] summary::before { content: "\25BE\00a0"; }
+  .ed-sec summary:hover { color: var(--hi); }
+  .ed-sec-body { padding: 2px 0 4px 4px; }
+  #skull-editor button {
+    background: #26262c; color: #ddd; border: 1px solid var(--edge); border-radius: 5px;
+    padding: 4px 9px; cursor: pointer; font: inherit;
+  }
+  #skull-editor button:hover { border-color: var(--hi); color: var(--hi); }
+  #skull-editor button.primary { background: var(--hi); color: #111; border-color: var(--hi); }
+  #skull-editor button.on { background: #3a3320; border-color: var(--hi); color: var(--hi); }
+  #skull-editor select, #skull-editor input[type=number], #skull-editor input[type=text] {
+    background: #101014; color: #ddd; border: 1px solid var(--edge); border-radius: 4px;
+    padding: 3px 5px; font: inherit; width: 100%; box-sizing: border-box;
+  }
+  #skull-editor input[type=range] { width: 100%; }
+  #skull-editor .row { display: flex; gap: 6px; align-items: center; margin: 3px 0; }
+  #skull-editor .row label { flex: 0 0 72px; color: #aaa; }
+  #ed-el-list .el-item { padding: 5px 10px; cursor: pointer; border-bottom: 1px solid #222; }
+  #ed-el-list .el-item:hover { background: #222; }
+  #ed-el-list .el-item.sel { background: #2c2614; color: var(--hi); }
+  #ed-el-list .el-item .sub { color: #777; font-size: 10px; }
+  #ed-left { display: flex; flex-direction: column; padding: 0; }
+  #ed-el-filter { margin: 6px; padding: 4px 7px; background: #101014; color: #ddd; border: 1px solid var(--edge); border-radius: 5px; font: inherit; flex: 0 0 auto; }
+  #ed-el-list { overflow-y: auto; flex: 1 1 auto; }
+  .el-item.el-row { display: flex; gap: 7px; align-items: center; }
+  .el-thumb { width: 30px; height: 30px; flex: 0 0 auto; border-radius: 3px; object-fit: cover; background: #0c0c10; border: 1px solid #2a2a30; }
+  .el-thumb-x { display: inline-block; }
+  .el-meta { min-width: 0; }
+  .el-name { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  #ed-hint { color: #887; font-size: 11px; margin-top: 6px; }
+  .ed-badge { color: #777; font-size: 10px; padding: 0 6px; }
+</style>
+<!-- EDITOR:CSS:END -->
+</head>
+<body>
+<div id="boot-spinner">CARGANDO</div>
+
+<!-- EDITOR:DOM:START -->
+<div id="skull-editor">
+  <div class="panel" id="ed-menubar"></div>
+  <div id="ed-options"><div class="box"><h3>Deck options</h3><div id="ed-options-body"></div>
+    <div class="row" style="margin-top:12px;justify-content:flex-end;display:flex;gap:8px">
+      <button id="ed-opt-cancel">Cancel</button><button id="ed-opt-save" class="primary">Save</button>
+    </div></div></div>
+  <div id="ed-pptx" class="ed-modal"><div class="box"><h3>Export PowerPoint</h3>
+    <div class="row"><label>image format</label><select id="px-format">
+      <option value="png">PNG (lossless, large)</option><option value="jpg" selected>JPEG (smaller)</option></select></div>
+    <div class="row" id="px-q-row"><label>JPEG quality</label><input type="number" id="px-quality" min="40" max="100" value="85"></div>
+    <div class="row"><label>font size (pt)</label><input type="number" id="px-fontsize" min="0" max="96" value="0" title="0 = auto-fit to each text box height"></div>
+    <div class="row"><label title="match the on-screen entrances - every entrance becomes a PowerPoint Fade, auto-playing and staggered by its delay">animate entrances</label><input type="checkbox" id="px-animate" checked></div>
+    <div class="row"><label title="bake idle loops & mesh/bone rigs into looping video/GIF embedded at each animated element">animated assets</label><select id="px-clips">
+      <option value="none" selected>none (static pictures)</option><option value="mp4">mp4 video (looping)</option><option value="gif">GIF (looping)</option></select></div>
+    <div class="row" id="px-fps-row" style="display:none"><label>clip fps</label><input type="number" id="px-fps" min="6" max="30" value="18"></div>
+    <div class="row"><label title="export each element's fill/blur footprint as a cover shape underneath it">patch layer</label><input type="checkbox" id="px-patches"></div>
+    <div class="row"><label>save to</label><input type="text" id="px-out" value="dist/presentation.pptx"><button id="px-browse" title="browse for a folder">…</button></div>
+    <div id="ed-hint">Text boxes stay editable; blend-mode elements are flattened. PowerPoint only does Fade, so all entrances map to Fade.</div>
+    <div class="row" style="margin-top:12px;justify-content:flex-end;display:flex;gap:8px">
+      <button id="px-cancel">Cancel</button><button id="px-go" class="primary">Export</button></div>
+  </div></div>
+  <div id="ed-html" class="ed-modal"><div class="box"><h3>Export HTML</h3>
+    <div class="row"><label title="bundle the editor so you can press E to edit the shipped file">embed editor</label><input type="checkbox" id="hx-embed"></div>
+    <div class="row"><label>save to</label><input type="text" id="hx-out" value="dist/presentation.html"><button id="hx-browse" title="browse for a folder">…</button></div>
+    <div id="ed-hint">Single self-contained HTML (PixiJS + GSAP + assets inlined). Live-animated.</div>
+    <div class="row" style="margin-top:12px;justify-content:flex-end;display:flex;gap:8px">
+      <button id="hx-cancel">Cancel</button><button id="hx-go" class="primary">Export</button></div>
+  </div></div>
+  <div id="ed-baked" class="ed-modal"><div class="box"><h3>Export baked HTML (no WebGL)</h3>
+    <div class="row"><label>clip format</label><select id="bk-format">
+      <option value="mp4" selected>mp4 video</option><option value="gif">GIF</option></select></div>
+    <div class="row"><label>clip fps</label><input type="number" id="bk-fps" min="6" max="30" value="18"></div>
+    <div class="row"><label>assets</label><select id="bk-assets">
+      <option value="base64" selected>base64 (single portable file, heavier)</option><option value="folder">folder beside the HTML (lighter)</option></select></div>
+    <div class="row"><label>save to</label><input type="text" id="bk-out" value="dist/baked.html"><button id="bk-browse" title="browse for a folder">…</button></div>
+    <div id="ed-hint">A plain DOM/CSS slideshow: animated assets become looping video/GIF, the rest static images. Maximum compatibility; no live interactivity.</div>
+    <div class="row" style="margin-top:12px;justify-content:flex-end;display:flex;gap:8px">
+      <button id="bk-cancel">Cancel</button><button id="bk-go" class="primary">Export</button></div>
+  </div></div>
+  <div id="ed-browse" class="ed-modal"><div class="box" style="width:460px"><h3 id="brz-title">Choose</h3>
+    <div class="row"><button id="brz-up" title="up one folder">&#8593;</button><span id="brz-path" class="ed-badge" style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"></span></div>
+    <div id="brz-list" style="height:260px;overflow-y:auto;border:1px solid var(--edge);border-radius:6px;background:#101014;margin:6px 0"></div>
+    <div class="row" id="brz-name-row"><label>filename</label><input type="text" id="brz-name"></div>
+    <div class="row" style="margin-top:8px;justify-content:flex-end;display:flex;gap:8px">
+      <button id="brz-cancel">Cancel</button><button id="brz-ok" class="primary">Choose</button></div>
+  </div></div>
+  <div class="panel" id="ed-top">
+    <button id="ed-prev" title="previous slide (Left arrow when editor is closed)">&#9664;</button>
+    <span id="ed-slide-label" class="ed-badge">s01</span>
+    <button id="ed-next" title="next slide">&#9654;</button>
+    <button id="ed-replay" title="replay this slide's entrance animations">Replay</button>
+    <span style="width:14px"></span>
+    <button id="ed-tool-box" class="studio-only tool" data-tool="box" title="Draw a new element: drag a rectangle on the slide. Esc cancels.">&#9645; Box</button>
+    <button id="ed-tool-poly" class="studio-only tool" data-tool="poly" title="Draw a polygon element: click vertices, Enter or double-click to close. Becomes an alpha-masked cutout. Esc cancels.">&#11041; Poly</button>
+    <button id="ed-preview" class="studio-only primary" title="build the final single-file presentation and open it in a new tab - what your audience will see">&#9658; Preview</button>
+    <button id="ed-export" class="primary" title="download your edits as overrides.json (bake with: node scripts/build.mjs --apply overrides.json)">Export overrides.json</button>
+    <button id="ed-reset" title="discard saved edits for the selected element and reload">Reset element</button>
+    <button id="ed-help-btn" title="help &amp; shortcuts">?</button>
+    <span id="ed-save-status" class="ed-badge"></span>
+  </div>
+  <div id="ed-help"><div class="box">
+    <h3>Editor help</h3>
+    <h4>Workflow</h4>
+    <div>1 &middot; Pick an element (canvas click or left list; <b>&#9632; Background</b> edits the slide background's idle animation).<br>
+    2 &middot; Tune <i>Entrance</i> (how it appears), <i>Idle</i> (continuous motion), <i>Parallax</i> (mouse depth) in the right panel. <b>Replay</b> previews the slide.<br>
+    3 &middot; For organic motion: <b>Enable mesh deform</b>, place pins, switch to Pose mode, drag pins at different playhead times to set keyframes.<br>
+    4 &middot; Studio: edits autosave to the project. Single-file: <b>Export overrides.json</b>, then rebuild.</div>
+    <h4>Shortcuts</h4>
+    <table>
+      <tr><td><kbd>E</kbd></td><td>toggle editor</td><td><kbd>Esc</kbd></td><td>close editor / cancel tool</td></tr>
+      <tr><td><kbd>&#8592;</kbd> <kbd>&#8594;</kbd> <kbd>Space</kbd></td><td>navigate slides (editor closed)</td><td><kbd>Ctrl+S</kbd></td><td>save (studio)</td></tr>
+      <tr><td><kbd>Ctrl+Del</kbd></td><td>delete selected element (studio)</td><td><kbd>Del</kbd></td><td>delete selected pin (rig)</td></tr>
+    </table>
+    <h4>Rig (mesh / 2D bones)</h4>
+    <div>Fastest start: pick a <b>Quick motion</b> preset (Breathe, Sway, Float, Pendulum, Wave) in the Mesh deform panel — it builds the pins and a looping animation you can then refine. Or build by hand:</div>
+    <table>
+      <tr><td><b>① Setup pins</b></td><td>click the image to add a pin, drag to place it. Gold pins drive motion, gray pins anchor (hold still). <kbd>Shift</kbd>+click a pin then click = child bone (chain); <kbd>Alt</kbd>+drag = rotate; <kbd>Delete</kbd> removes a pin.</td></tr>
+      <tr><td><b>② Animate</b></td><td>move the playhead on the timeline, then drag a pin to record a keyframe there. The first keyframe auto-adds rest keys at 0s and the end so the motion loops home. <b>▶ Play</b> previews.</td></tr>
+      <tr><td>timeline</td><td>drag the ruler to scrub; drag a diamond sideways to re-time it; right-click a diamond (or select it and <b>Delete key</b>) to remove it.</td></tr>
+    </table>
+    <h4>Saving vs exporting - what's what</h4>
+    <table>
+      <tr><td><b>Save</b> <kbd>Ctrl+S</kbd></td><td>writes your edits into the project file (<code>work/manifest.json</code>). Studio autosaves ~1s after every change; this is your working document, not a deliverable. (The single-file editor saves to browser localStorage instead.)</td></tr>
+      <tr><td><b>Preview</b></td><td>builds the final presentation and opens it in a new tab - exactly what your audience will see (no editor, no gizmos).</td></tr>
+      <tr><td><b>Export HTML</b></td><td>produces the deliverables in <code>dist/</code>: <code>presentation.html</code> (viewer-only, share this), <code>editor.html</code> (this editor bundled with the deck), or <code>presentation_with_editor.html</code> (one file that presents and edits).</td></tr>
+      <tr><td><b>Export manifest.json</b></td><td>downloads the whole project document (every slide, element, animation, rig). Use as a backup, for hand-editing, or to restore by copying over <code>work/manifest.json</code>.</td></tr>
+      <tr><td><b>Export overrides.json</b></td><td>downloads only your <i>edits</i> (per-element diffs). Made for the single-file editor workflow: edit <code>editor.html</code> anywhere, export, then bake with <code>node scripts/build.mjs --apply overrides.json</code>. In Studio you rarely need it - Save already persists everything.</td></tr>
+    </table>
+    <h4>Studio extras</h4>
+    <div>Drag a selected element to move its detection box, gold corner to resize, then <b>Re-crop &amp; reload</b>. <b>&#9645; Box</b>/<b>&#11041; Poly</b> draw new elements (editable immediately; pixels appear after re-crop). Polygon: click vertices; <b>click the first (ringed) node</b>, <kbd>Enter</kbd> or double-click to close; <kbd>Backspace</kbd> or right-click undoes the last point. <b>Mask areas</b> (+/&minus; Box/Poly) boolean-edit the selected element's shape. <b>OCR text</b> reads the element's text from the slide image.</div>
+    <div style="text-align:right;margin-top:12px"><button id="ed-help-close" class="primary">Close</button></div>
+  </div></div>
+  <div class="panel" id="ed-left">
+    <input type="text" id="ed-el-filter" placeholder="filter elements…" autocomplete="off">
+    <div id="ed-el-list"></div>
+  </div>
+  <div class="panel" id="ed-right"><div id="ed-inspector"><h4>No selection</h4>
+    <div id="ed-hint">Click an element on the canvas or in the list. Press E to close the editor.</div>
+  </div></div>
+  <div class="panel" id="ed-bottom">
+    <div class="row" id="ed-rig-toolbar">
+      <span class="ed-seg">
+        <button id="ed-mode-setup" class="seg-btn on" title="Place and move pins on the still image. Pins anchor or drive the deformation.">&#9312; Setup pins</button>
+        <button id="ed-mode-anim" class="seg-btn" title="Move the playhead, then drag a pin to record a keyframe at that time.">&#9313; Animate</button>
+      </span>
+      <span style="width:8px"></span>
+      <button id="ed-rig-addpin" title="add a new pin at the centre, then drag it where you want (or click empty image in Setup mode)">+ Pin</button>
+      <button id="ed-rig-rmpin" title="delete the selected pin (or press Delete)">&minus; Pin</button>
+      <button id="ed-rig-pinrole" disabled title="select a pin, then switch it between anchor (holds still) and animated (can be keyframed)">Pin role</button>
+      <span style="width:8px"></span>
+      <button id="ed-rig-play" title="play / pause the loop">&#9658; Play</button>
+      <label title="loop the animation">loop</label><input type="checkbox" id="ed-rig-loop" checked>
+      <label title="loop duration in seconds">dur</label>
+      <input type="number" id="ed-rig-dur" min="0.2" step="0.1" value="3" style="width:54px">
+      <button id="ed-rig-keypin" title="record the selected pin's position as a keyframe here">Key pin</button>
+      <button id="ed-rig-keyall" title="record every pin at the playhead">Key all</button>
+      <button id="ed-rig-delkey" title="delete the selected keyframe">Del key</button>
+      <span id="ed-rig-rec" class="ed-rec"></span>
+      <span id="ed-rig-time" class="ed-badge">0.00s</span>
+    </div>
+    <div id="ed-rig-hint" class="ed-rig-hint"></div>
+    <canvas id="ed-timeline-canvas" title="drag the ruler to scrub; drag a diamond to re-time it; right-click a diamond to delete"></canvas>
+  </div>
+</div>
+<!-- EDITOR:DOM:END -->
+
+{{VENDOR}}
+<script id="manifest" type="application/json">{{MANIFEST}}</script>
+<script>{{ASSETS}}</script>
+<script>{{RUNTIME}}</script>
+</body>
+</html>

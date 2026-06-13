@@ -1,0 +1,9 @@
+graft runtime/src
+include runtime/template.html
+include skull_studio/*.mjs
+recursive-include docs *.md
+include sample/*.pdf
+include LICENSE THIRD_PARTY.md SECURITY.md
+prune runtime/vendor
+prune work
+prune dist

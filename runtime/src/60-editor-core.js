@@ -1,0 +1,347 @@
+/* Editor core: E-key toggle, selection, gizmo drawing, top-bar wiring. */
+(function () {
+  "use strict";
+  const S = window.SKULL;
+
+  class Editor {
+    constructor(manager) {
+      this.manager = manager;
+      this.isOpen = false;
+      this.selected = null;        // ElementView
+      this.rigMode = false;        // bottom timeline panel open
+      this.dom = {
+        rootEl: document.getElementById("skull-editor"),
+        list: document.getElementById("ed-el-list"),
+        inspector: document.getElementById("ed-inspector"),
+        slideLabel: document.getElementById("ed-slide-label"),
+        bottom: document.getElementById("ed-bottom"),
+        saveStatus: document.getElementById("ed-save-status"),
+      };
+      this.gizmoG = new PIXI.Graphics();
+      S.gizmos.addChild(this.gizmoG);
+      if (window.STUDIO) this.dom.rootEl.classList.add("studio");
+
+      window.addEventListener("keydown", (ev) => {
+        if (ev.key.toLowerCase() === "e" && !this.isTyping(ev)) this.toggle();
+        if (ev.key === "Escape" && this.isOpen) this.toggle();
+      });
+      const filter = document.getElementById("ed-el-filter");
+      if (filter) filter.oninput = (e) => this.setFilter(e.target.value);
+      document.getElementById("ed-prev").onclick = () => manager.prev();
+      document.getElementById("ed-next").onclick = () => manager.next();
+      document.getElementById("ed-replay").onclick = () => {
+        const v = manager.currentView;
+        if (v) { v.buildTimeline(); v.timeline.restart(); }
+      };
+      document.getElementById("ed-reset").onclick = () => {
+        if (this.selected && S.persist) S.persist.resetElement(this.selected.spec.id);
+      };
+      document.getElementById("ed-export").onclick = () => S.persist && S.persist.exportOverrides();
+      const helpBtn = document.getElementById("ed-help-btn");
+      const helpModal = document.getElementById("ed-help");
+      if (helpBtn) helpBtn.onclick = () => helpModal.classList.add("open");
+      const helpClose = document.getElementById("ed-help-close");
+      if (helpClose) helpClose.onclick = () => helpModal.classList.remove("open");
+
+      S.app.ticker.add(() => { if (this.isOpen) this.drawGizmos(); });
+      if (window.STUDIO) this.bindBoxEditing();
+
+      // double-click a rigged element to jump straight into its rig editor
+      S.app.canvas.addEventListener("dblclick", () => {
+        if (!this.isOpen) return;
+        if (this.drawTools && this.drawTools.tool) return; // polygon uses dblclick
+        if (this.rigEditor && this.rigEditor.active) return;
+        const ev = this.selected;
+        if (ev && ev.spec.rig) this.rigEditor.open(ev);
+      });
+    }
+
+    /* studio only: drag selected element to move its bbox, drag the corner
+       handle to resize. The crop texture is stale until "Re-crop & reload". */
+    bindBoxEditing() {
+      const canvas = S.app.canvas;
+      const HANDLE = 14;
+      let drag = null; // {mode:'move'|'resize', startX, startY, bbox0}
+      canvas.addEventListener("pointerdown", (e) => {
+        if (!this.isOpen || !this.selected) return;
+        if (this.rigEditor && this.rigEditor.active) return;
+        if (this.drawTools && this.drawTools.tool) return;
+        const ev = this.selected;
+        const p = S.root.toLocal({ x: e.clientX, y: e.clientY });
+        const b = S.bboxToDesign(ev.spec.bbox, this.manager.deck);
+        const nearCorner = Math.abs(p.x - (b.x + b.w)) < HANDLE && Math.abs(p.y - (b.y + b.h)) < HANDLE;
+        const inside = p.x >= b.x && p.x <= b.x + b.w && p.y >= b.y && p.y <= b.y + b.h;
+        if (nearCorner || inside) {
+          drag = { mode: nearCorner ? "resize" : "move", startX: p.x, startY: p.y,
+                   bbox0: [...ev.spec.bbox] };
+        }
+      });
+      canvas.addEventListener("pointermove", (e) => {
+        if (!drag || !this.selected) return;
+        const ev = this.selected;
+        const deck = this.manager.deck;
+        const p = S.root.toLocal({ x: e.clientX, y: e.clientY });
+        const dx = (p.x - drag.startX) / deck.designWidth;
+        const dy = (p.y - drag.startY) / deck.designHeight;
+        const b0 = drag.bbox0;
+        let nb;
+        if (drag.mode === "move") {
+          nb = [b0[0] + dx, b0[1] + dy, b0[2] + dx, b0[3] + dy];
+        } else {
+          nb = [b0[0], b0[1], Math.max(b0[0] + 0.01, b0[2] + dx), Math.max(b0[1] + 0.01, b0[3] + dy)];
+        }
+        ev.spec.bbox = nb.map((v) => +S.clamp(v, 0, 1).toFixed(4));
+        ev.relayout();
+        this.boxEdited = true;
+      });
+      const end = () => {
+        if (!drag) return;
+        drag = null;
+        if (this.boxEdited && this.selected) {
+          this.boxEdited = false;
+          if (S.persist) S.persist.markDirty(this.selected.spec.id);
+          if (S.inspector) S.inspector.show(this.selected); // refresh bbox readout
+        }
+      };
+      canvas.addEventListener("pointerup", end);
+      canvas.addEventListener("pointerleave", end);
+    }
+
+    isTyping(ev) {
+      const t = ev.target;
+      return t && (t.tagName === "INPUT" || t.tagName === "SELECT" || t.tagName === "TEXTAREA");
+    }
+
+    toggle() {
+      this.isOpen = !this.isOpen;
+      this.dom.rootEl.classList.toggle("open", this.isOpen);
+      this.setElementInteractivity(this.isOpen);
+      if (!this.isOpen) {
+        this.select(null);
+        this.gizmoG.clear();
+        if (this.rigEditor) this.rigEditor.close();
+      } else {
+        this.onSlideChanged();
+      }
+      this.updateInset();
+    }
+
+    /* dock the workspace between the panels while the editor is open */
+    updateInset() {
+      if (!S.setInset) return;
+      if (!this.isOpen) return S.setInset(null);
+      const rigOpen = this.rigEditor && this.rigEditor.active;
+      this.dom.rootEl.classList.toggle("rig-open", !!rigOpen);
+      S.setInset({ left: 220, right: 290, top: 60, bottom: rigOpen ? 180 : 12 });
+    }
+
+    setElementInteractivity(on) {
+      const v = this.manager.currentView;
+      if (!v || !v.elements) return;
+      for (const ev of v.elements) {
+        ev.view.eventMode = on ? "static" : "auto";
+        ev.view.cursor = on ? "pointer" : "default";
+        if (on && !ev.__edBound) {
+          ev.__edBound = true;
+          ev.view.on("pointerdown", (e) => {
+            if (this.rigEditor && this.rigEditor.active) return; // rig editor owns clicks
+            if (this.drawTools && this.drawTools.tool) return;   // draw tool owns clicks
+            this.select(ev);
+            e.stopPropagation();
+          });
+        }
+      }
+    }
+
+    onSlideChanged() {
+      if (!this.isOpen) return;
+      const v = this.manager.currentView;
+      this.dom.slideLabel.textContent = v ? v.spec.id : "-";
+      this.select(null);
+      this.setElementInteractivity(true);
+      this.rebuildList();
+    }
+
+    rebuildList() {
+      const v = this.manager.currentView;
+      this.dom.list.innerHTML = "";
+      if (!v) return;
+      // background pseudo-entry (idle animation, etc.)
+      const bgDiv = document.createElement("div");
+      bgDiv.className = "el-item";
+      const bgIdle = v.spec.background.idle;
+      bgDiv.innerHTML = `<div>&#9632; Background <span class="sub">slide</span></div>` +
+        `<div class="sub">idle: ${(bgIdle && bgIdle.type) || "none"}</div>`;
+      bgDiv.onclick = () => this.selectBackground();
+      this.__bgListItem = bgDiv;
+      this.dom.list.appendChild(bgDiv);
+      // sort by z so the list mirrors stacking order (top of list = front)
+      const ordered = [...v.elements].sort((a, b) => (b.spec.z || 0) - (a.spec.z || 0));
+      for (const ev of ordered) {
+        const div = document.createElement("div");
+        div.className = "el-item el-row";
+        const thumb = this.thumbUri(ev.spec);
+        div.innerHTML =
+          (thumb ? `<img class="el-thumb" loading="lazy" src="${thumb}">` : `<span class="el-thumb el-thumb-x"></span>`) +
+          `<div class="el-meta"><div class="el-name">${ev.spec.name || ev.spec.id}</div>` +
+          `<div class="sub">${ev.spec.id} &middot; ${ev.spec.type}/${ev.spec.role || ""}` +
+          `${(ev.spec.text ? " &middot; " + ev.spec.text.slice(0, 28) : "")}</div></div>`;
+        div.onclick = () => this.select(ev);
+        ev.__edListItem = div;
+        this.dom.list.appendChild(div);
+      }
+      this.applyFilter();
+    }
+
+    thumbUri(spec) {
+      if (!spec.crop) return null;
+      if (window.ASSET_BASE) return window.ASSET_BASE + spec.crop + "?v=" + (S.assetEpoch || 0);
+      return (window.ASSETS || {})[spec.crop] || null;
+    }
+
+    applyFilter() {
+      const q = (this.__filter || "").toLowerCase();
+      const v = this.manager.currentView;
+      if (!v) return;
+      for (const ev of v.elements) {
+        const it = ev.__edListItem;
+        if (!it) continue;
+        const hay = `${ev.spec.name || ""} ${ev.spec.id} ${ev.spec.type} ${ev.spec.role || ""} ${ev.spec.text || ""}`.toLowerCase();
+        it.style.display = !q || hay.includes(q) ? "" : "none";
+      }
+    }
+
+    /* clone the selected element with its animations/rig */
+    duplicateElement(ev) {
+      const v = this.manager.currentView;
+      const spec = S.deepClone(ev.spec);
+      let n = 1, id;
+      do { id = `${v.spec.id}_dup${n++}`; } while (v.spec.elements.some((e) => e.id === id));
+      spec.id = id;
+      spec.name = (ev.spec.name || ev.spec.id) + " copy";
+      const dx = 0.02, dy = 0.02;
+      spec.bbox = spec.bbox.map((c, i) => S.clamp(c + (i % 2 ? dy : dx), 0, 1));
+      if (spec.cropBbox) spec.cropBbox = spec.cropBbox.map((c, i) => S.clamp(c + (i % 2 ? dy : dx), 0, 1));
+      spec.z = (Math.max(0, ...v.spec.elements.map((e) => e.z || 0)) + 1);
+      // keep crop pointing at the original so it renders immediately
+      v.spec.elements.push(spec);
+      const nev = new S.ElementView(spec, this.manager.deck);
+      nev.build().then(() => {
+        v.elementLayer.addChild(nev.parallaxNode);
+        v.elements.push(nev);
+        this.setElementInteractivity(true);
+        this.rebuildList();
+        this.select(nev);
+        if (S.persist) S.persist.markDirty(id);
+        if (S.studio) S.studio.needsRecrop("duplicated element");
+      });
+    }
+
+    /* swap z with the nearest neighbour above (+1) / below (-1) */
+    nudgeZ(ev, dir) {
+      const v = this.manager.currentView;
+      const others = v.elements.filter((e) => e !== ev);
+      const z = ev.spec.z || 0;
+      const cands = others.filter((e) => dir > 0 ? (e.spec.z || 0) > z : (e.spec.z || 0) < z);
+      if (!cands.length) return;
+      const nb = cands.reduce((a, b) => (dir > 0
+        ? ((a.spec.z || 0) < (b.spec.z || 0) ? a : b)
+        : ((a.spec.z || 0) > (b.spec.z || 0) ? a : b)));
+      const tmp = ev.spec.z; ev.spec.z = nb.spec.z; nb.spec.z = tmp;
+      ev.parallaxNode.zIndex = ev.spec.z;
+      nb.parallaxNode.zIndex = nb.spec.z;
+      this.rebuildList();
+      this.select(ev);
+      if (S.persist) { S.persist.markDirty(ev.spec.id); S.persist.markDirty(nb.spec.id); }
+    }
+
+    setFilter(q) { this.__filter = q; this.applyFilter(); }
+
+    select(ev) {
+      this.selected = ev;
+      this.bgSelected = false;
+      const v = this.manager.currentView;
+      if (v) for (const e of v.elements) {
+        if (e.__edListItem) e.__edListItem.classList.toggle("sel", e === ev);
+      }
+      if (this.__bgListItem) this.__bgListItem.classList.remove("sel");
+      if (S.inspector) S.inspector.show(ev);
+      if (this.rigEditor) this.rigEditor.onSelect(ev);
+    }
+
+    selectBackground() {
+      this.selected = null;
+      this.bgSelected = true;
+      const v = this.manager.currentView;
+      if (v) for (const e of v.elements) {
+        if (e.__edListItem) e.__edListItem.classList.remove("sel");
+      }
+      if (this.__bgListItem) this.__bgListItem.classList.add("sel");
+      if (this.rigEditor) this.rigEditor.close();
+      if (S.inspector) S.inspector.showBackground(v);
+    }
+
+    drawGizmos() {
+      const g = this.gizmoG;
+      g.clear();
+      const v = this.manager.currentView;
+      if (!v) return;
+      for (const ev of v.elements) {
+        const b = ev.box;
+        const sel = ev === this.selected;
+        g.rect(b.x, b.y, b.w, b.h)
+          .stroke({ width: sel ? 2.5 : 1, color: sel ? 0xc9a227 : 0x4a90d9, alpha: sel ? 1 : 0.55 });
+        if (sel && window.STUDIO && !(this.rigEditor && this.rigEditor.active)) {
+          const deck = this.manager.deck;
+          const d = S.bboxToDesign(ev.spec.bbox, deck);
+          g.rect(d.x, d.y, d.w, d.h).stroke({ width: 1, color: 0xffffff, alpha: 0.5 });
+          g.rect(d.x + d.w - 7, d.y + d.h - 7, 14, 14).fill({ color: 0xc9a227, alpha: 0.95 });
+          // the element's true mask shape: base polygon + boolean regions
+          const W = deck.designWidth, H = deck.designHeight;
+          const drawPts = (pts, color) => {
+            g.moveTo(pts[0][0] * W, pts[0][1] * H);
+            for (const p of pts.slice(1)) g.lineTo(p[0] * W, p[1] * H);
+            g.closePath().stroke({ width: 1.5, color, alpha: 0.85 });
+          };
+          if (ev.spec.polygon) drawPts(ev.spec.polygon, 0x6ee76e);
+          for (const r of ev.spec.regions || []) {
+            drawPts(r.pts, r.op === "add" ? 0x6ee76e : 0xe7706e);
+          }
+        }
+      }
+      // pending elements (drawn but not yet cropped) - green outline
+      const pending = v.spec.elements.filter((sp) => !v.elements.some((e) => e.spec === sp));
+      for (const sp of pending) {
+        const d = S.bboxToDesign(sp.bbox, this.manager.deck);
+        g.rect(d.x, d.y, d.w, d.h).stroke({ width: 2, color: 0x6ee76e, alpha: 0.8 });
+        if (sp.polygon) {
+          const W = this.manager.deck.designWidth, H = this.manager.deck.designHeight;
+          g.moveTo(sp.polygon[0][0] * W, sp.polygon[0][1] * H);
+          for (const p of sp.polygon.slice(1)) g.lineTo(p[0] * W, p[1] * H);
+          g.closePath().stroke({ width: 1.5, color: 0x6ee76e, alpha: 0.6 });
+        }
+      }
+      if (this.rigEditor && this.rigEditor.active) this.rigEditor.drawGizmos(g);
+      if (this.drawTools) this.drawTools.drawGizmos(g);
+    }
+
+    rebuildPending() { this.rebuildList(); }
+
+    /* studio: remove an element from the deck (view + manifest) */
+    deleteElement(ev) {
+      if (!window.STUDIO) return;
+      if (!confirm(`Delete ${ev.spec.id}?`)) return;
+      const v = this.manager.currentView;
+      const i = v.spec.elements.indexOf(ev.spec);
+      if (i >= 0) v.spec.elements.splice(i, 1);
+      const j = v.elements.indexOf(ev);
+      if (j >= 0) { v.elements.splice(j, 1); ev.destroy(); }
+      if (S.parallax) S.parallax.setElements(v.elements);
+      this.select(null);
+      this.rebuildList();
+      if (S.persist) S.persist.markDirty(ev.spec.id);
+    }
+  }
+
+  S.Editor = Editor;
+})();

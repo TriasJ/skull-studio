@@ -1,0 +1,24 @@
+# generated artifacts
+/work/
+/dist/
+/runtime/vendor/
+
+# python
+__pycache__/
+*.pyc
+.venv/
+*.egg-info/
+build/
+uv.lock
+
+# editor / tooling
+.playwright-mcp/
+.vscode/
+.idea/
+.DS_Store
+
+# user decks dropped at the repo root (the sample stays under sample/)
+/*.pdf
+/*.pptx
+!sample/*.pdf
+!sample/*.pptx
