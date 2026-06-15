@@ -6,7 +6,8 @@
 
   const ENTRANCES = ["none", "fadeIn", "fadeUp", "fadeDown", "fadeLeft", "fadeRight",
     "scaleIn", "maskReveal", "blurIn", "drawOn", "staggerText"];
-  const IDLES = ["float", "breath", "pulse", "sway", "shimmer", "meshWave"];
+  const IDLES = ["float", "breath", "pulse", "sway", "shimmer", "glow", "wave", "ripple", "swirl", "meshWave"];
+  const MESH_IDLES = ["meshWave", "wave", "ripple", "swirl"];
   const EASES = ["power1.out", "power2.out", "power3.out", "power2.inOut", "sine.inOut",
     "back.out(1.4)", "expo.out", "elastic.out(1,0.4)", "none"];
   const DIRECTIONS = ["left", "right", "up", "down", "center"];
@@ -145,9 +146,15 @@
           <input type="checkbox" data-idle="${name}" ${on ? "checked" : ""}></div>`);
         if (on) {
           const idle = idles.find((i) => i.type === name);
-          const amt = idle.amplitude ?? idle.amount ?? idle.degrees ?? 0.01;
+          const amt = idle.amplitude ?? idle.amount ?? idle.degrees ?? 0.02;
           idleRows.push(row("&nbsp;&nbsp;amount", num(`idle-amt-${name}`, amt, 0.005)));
-          idleRows.push(row("&nbsp;&nbsp;period", num(`idle-per-${name}`, idle.period ?? 4, 0.5)));
+          if (MESH_IDLES.includes(name)) {
+            idleRows.push(row("&nbsp;&nbsp;speed", num(`idle-speed-${name}`, idle.speed ?? 0.6, 0.1)));
+          } else {
+            idleRows.push(row("&nbsp;&nbsp;period", num(`idle-per-${name}`, idle.period ?? 4, 0.5)));
+          }
+          if (name === "ripple") idleRows.push(row("&nbsp;&nbsp;waves", num(`idle-waves-${name}`, idle.waves ?? 2, 1)));
+          if (name === "glow") idleRows.push(`<div class="row"><label>&nbsp;&nbsp;color</label><input type="color" id="idle-color-${name}" value="${idle.color || "#ffffff"}"></div>`);
         }
       }
       h.push(this.sec("idle", "Idle", idleRows));
@@ -314,6 +321,11 @@
           const name = cb.dataset.idle;
           spec.idle = spec.idle.filter((i) => i.type !== name);
           if (cb.checked) spec.idle.push({ type: name });
+          // mesh effects (wave/ripple/swirl/meshWave) need a MeshPlane view; rebuild
+          // when the mesh-ness may have changed (not for 3D models)
+          if (MESH_IDLES.includes(name) && spec.type !== "model3d" && ev.view && ev.view.texture) {
+            ev.makeView(ev.view.texture, !!spec.rig);
+          }
           this.commit(ev);
           this.show(ev);
         };
@@ -323,13 +335,25 @@
           const idle = spec.idle.find((i) => i.type === name);
           if (!idle) return;
           const v = parseFloat(e.target.value);
-          if (name === "sway") idle.degrees = v;
-          else if (name === "pulse" || name === "shimmer" || name === "breath") idle.amount = v;
-          else idle.amplitude = v;
+          if (name === "sway" || name === "swirl") idle.degrees = v;
+          else if (name === "pulse" || name === "shimmer" || name === "breath" || name === "glow") idle.amount = v;
+          else idle.amplitude = v;                       // float, wave, ripple, meshWave
         });
         onchange(`idle-per-${name}`, (e) => {
           const idle = spec.idle.find((i) => i.type === name);
           if (idle) idle.period = parseFloat(e.target.value);
+        });
+        onchange(`idle-speed-${name}`, (e) => {
+          const idle = spec.idle.find((i) => i.type === name);
+          if (idle) idle.speed = parseFloat(e.target.value);
+        });
+        onchange(`idle-waves-${name}`, (e) => {
+          const idle = spec.idle.find((i) => i.type === name);
+          if (idle) idle.waves = Math.max(1, Math.min(3, parseInt(e.target.value, 10) || 2));
+        });
+        onchange(`idle-color-${name}`, (e) => {
+          const idle = spec.idle.find((i) => i.type === name);
+          if (idle) idle.color = e.target.value;
         });
       }
 

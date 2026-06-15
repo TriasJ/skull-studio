@@ -116,6 +116,54 @@
     return { stop() { tween.kill(); } };
   }
 
+  /* ---- shared mesh-displacement driver (generalizes meshWave) -------------
+     dispFn(x, y, texW, texH, tau, spec) -> [dx, dy] in texture pixels. Keep these
+     formulas identical to render_clips.py's displace_field() so video export matches. */
+  const MESH_IDLES = ["meshWave", "wave", "ripple", "swirl"];
+  function meshDisplace(ev, spec, dispFn) {
+    if (!(ev.view instanceof PIXI.MeshPlane) || ev.rig) return { stop() {} };
+    const buf = ev.view.geometry.getAttribute("aPosition").buffer;
+    const rest = Float32Array.from(buf.data);
+    const W = ev.view.texture.width, H = ev.view.texture.height;
+    const speed = spec.speed ?? 0.6;
+    let t = 0;
+    const cb = (ticker) => {
+      t += ticker.deltaMS / 1000;
+      const tau = t * speed;
+      for (let i = 0; i < buf.data.length; i += 2) {
+        const x = rest[i], y = rest[i + 1];
+        const d = dispFn(x, y, W, H, tau, spec);
+        buf.data[i] = x + d[0];
+        buf.data[i + 1] = y + d[1];
+      }
+      buf.update();
+    };
+    S.app.ticker.add(cb);
+    return { stop() { S.app.ticker.remove(cb); buf.data.set(rest); buf.update(); } };
+  }
+  function waveDisp(x, y, W, H, tau, s) {
+    const amp = (s.amplitude ?? 0.02) * H, waves = s.waves ?? 2;
+    if (s.axis === "x") return [amp * Math.sin(2 * Math.PI * ((y / H) * waves + tau)), 0];
+    return [0, amp * Math.sin(2 * Math.PI * ((x / W) * waves + tau))];
+  }
+  const RF = [3, 5.5, 8], RS = [1.0, 1.4, 0.8], RPX = [0, 1.7, 3.1], RPY = [2.0, 0.5, 4.2], RA = [1.0, 0.6, 0.45];
+  function rippleDisp(x, y, W, H, tau, s) {       // underwater: sum of 2-3 sine waves, both axes
+    const amp = (s.amplitude ?? 0.012) * H, n = Math.max(1, Math.min(3, s.waves ?? 2));
+    let dx = 0, dy = 0;
+    for (let k = 0; k < n; k++) {
+      dx += RA[k] * Math.sin(2 * Math.PI * ((y / H) * RF[k] + tau * RS[k] + RPX[k]));
+      dy += RA[k] * Math.sin(2 * Math.PI * ((x / W) * RF[k] + tau * RS[k] + RPY[k]));
+    }
+    return [amp * dx, amp * dy];
+  }
+  function swirlDisp(x, y, W, H, tau, s) {
+    const cx = W / 2, cy = H / 2, maxR = Math.hypot(W, H) / 2, R = s.radius ?? 0.7;
+    const ux = x - cx, uy = y - cy, r = Math.hypot(ux, uy) / maxR;
+    const ang = S.deg2rad(s.degrees ?? 12) * Math.max(0, 1 - r / R) * Math.sin(2 * Math.PI * tau);
+    const ca = Math.cos(ang), sa = Math.sin(ang);
+    return [cx + ux * ca - uy * sa - x, cy + ux * sa + uy * ca - y];
+  }
+
   const idle = {
     float(ev, spec) {
       const amp = (spec.amplitude ?? 0.006) * D().designHeight;
@@ -175,6 +223,27 @@
       ev.model3d.setAutoRotate(dps);
       return { stop() { ev.model3d.setAutoRotate(0); } };
     },
+
+    // ---- 2D effect pack (mesh displacement; export-capable via render_clips) ----
+    wave(ev, spec) { return meshDisplace(ev, spec, waveDisp); },
+    ripple(ev, spec) { return meshDisplace(ev, spec, rippleDisp); },   // underwater
+    swirl(ev, spec) { return meshDisplace(ev, spec, swirlDisp); },
+
+    glow(ev, spec) {                       // pulsing additive bloom halo (core BlurFilter)
+      const view = ev.view;
+      if (!view) return { stop() {} };
+      const halo = new PIXI.Sprite(view.texture);
+      halo.width = view.width; halo.height = view.height;
+      halo.position.set(view.position.x, view.position.y);
+      halo.blendMode = "add";
+      halo.filters = [new PIXI.BlurFilter({ strength: (spec.amount ?? 0.4) * 30 + 6 })];
+      if (spec.color) halo.tint = parseInt(String(spec.color).replace("#", ""), 16) || 0xffffff;
+      ev.idleNode.addChildAt(halo, 0);     // behind the element
+      const tw = gsap.fromTo(halo, { alpha: 0.12 },
+        { alpha: spec.amount ?? 0.6, duration: (spec.period || 2) / 2, yoyo: true, repeat: -1, ease: "sine.inOut" });
+      return { stop() { tw.kill(); if (halo.parent) halo.parent.removeChild(halo); halo.destroy(); } };
+    },
+
     meshWave(ev, spec) {
       if (!(ev.view instanceof PIXI.MeshPlane) || ev.rig) return { stop() {} };
       const attr = ev.view.geometry.getAttribute("aPosition");

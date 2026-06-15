@@ -25,6 +25,8 @@ ROOT = Path(__file__).resolve().parent.parent
 WORK = ROOT / "work"
 CLIPS = WORK / "clips"
 FFMPEG = shutil.which("ffmpeg") or "ffmpeg"
+MESH_IDLE = ("wave", "ripple", "swirl", "meshWave")        # vertex-displacement effects
+EXPORT_IDLE = ("breath", "float", "sway", "pulse", "shimmer", "glow") + MESH_IDLE
 
 
 # ---------------------------------------------------------------- easing
@@ -213,11 +215,88 @@ def loop_duration(el, default=4.0, cap=6.0):
     return min(d or default, cap)
 
 
+_RF = [3, 5.5, 8]
+_RS = [1.0, 1.4, 0.8]
+_RPX = [0, 1.7, 3.1]
+_RPY = [2.0, 0.5, 4.2]
+_RA = [1.0, 0.6, 0.45]
+
+
+def displace_field(el, t, dur, w, h):
+    """Per-pixel (disp_x, disp_y) for the 2D mesh effects, mirroring 40-anim.js.
+    Temporal terms advance an INTEGER number of cycles over the clip so the baked
+    mp4/GIF loops seamlessly (HTML uses continuous wall-clock time instead)."""
+    eff = next((i for i in el.get("idle", []) if i["type"] in MESH_IDLE), None)
+    if not eff:
+        return None
+    xx, yy = np.meshgrid(np.arange(w, dtype=np.float32), np.arange(h, dtype=np.float32))
+    nx, ny = xx / max(w, 1), yy / max(h, 1)
+    u = t / dur
+    speed = eff.get("speed", 0.6)
+    ty = eff["type"]
+    if ty in ("wave", "meshWave"):
+        amp = eff.get("amplitude", 0.02) * h
+        waves = eff.get("waves", 2)
+        cyc = max(1, round(speed * dur))
+        if eff.get("axis") == "x":
+            return amp * np.sin(2 * np.pi * (ny * waves + u * cyc)), np.zeros_like(xx)
+        return np.zeros_like(xx), amp * np.sin(2 * np.pi * (nx * waves + u * cyc))
+    if ty == "ripple":
+        amp = eff.get("amplitude", 0.012) * h
+        n = max(1, min(3, eff.get("waves", 2)))
+        dx = np.zeros_like(xx); dy = np.zeros_like(xx)
+        for k in range(n):
+            cyc = max(1, round(speed * _RS[k] * dur))
+            dx += _RA[k] * np.sin(2 * np.pi * (ny * _RF[k] + u * cyc + _RPX[k]))
+            dy += _RA[k] * np.sin(2 * np.pi * (nx * _RF[k] + u * cyc + _RPY[k]))
+        return amp * dx, amp * dy
+    if ty == "swirl":
+        cx, cy = w / 2.0, h / 2.0
+        maxR = math.hypot(w, h) / 2.0
+        R = eff.get("radius", 0.7)
+        ux, uy = xx - cx, yy - cy
+        r = np.hypot(ux, uy) / maxR
+        cyc = max(1, round(speed * dur))
+        ang = math.radians(eff.get("degrees", 12)) * np.clip(1 - r / R, 0, None) * math.sin(2 * np.pi * u * cyc)
+        ca, sa = np.cos(ang), np.sin(ang)
+        return cx + ux * ca - uy * sa - xx, cy + ux * sa + uy * ca - yy
+    return None
+
+
+def apply_glow(img, spec, t, dur):
+    """Approximate the HTML additive-bloom glow: pulsing blurred premultiplied
+    halo added to the crop (alpha expanded where the halo is bright)."""
+    amount = float(spec.get("amount", 0.5))
+    period = float(spec.get("period", 2.0))
+    cyc = max(1, round(dur / max(period, 0.1)))
+    w_glow = 0.12 + (amount - 0.12) * (0.5 - 0.5 * math.cos(2 * math.pi * (t / dur) * cyc))
+    rgb = img[:, :, :3].astype(np.float32)
+    a = img[:, :, 3:4].astype(np.float32) / 255.0
+    k = max(3, int(amount * 30 + 6) | 1)               # odd kernel
+    blur = cv2.GaussianBlur(rgb * a, (k, k), 0)
+    col = np.array([1.0, 1.0, 1.0], np.float32)
+    hexc = (spec.get("color") or "").lstrip("#")
+    if len(hexc) >= 6:
+        col = np.array([int(hexc[i:i + 2], 16) / 255 for i in (0, 2, 4)], np.float32)
+    out = img.copy()
+    out[:, :, :3] = np.clip(rgb + blur * col * w_glow, 0, 255).astype(np.uint8)
+    halo = np.clip(blur.max(axis=2, keepdims=True) / 255.0 * w_glow * 380.0, 0, 255)
+    out[:, :, 3:4] = np.clip(np.maximum(img[:, :, 3:4].astype(np.float32), halo), 0, 255).astype(np.uint8)
+    return out
+
+
 def render_frame(el, crop_rgba, rig, t, dur, cropH_norm):
-    """apply rig (if any) then composable idle transforms; returns RGBA crop."""
+    """apply rig / mesh displacement, then composable idle transforms; returns RGBA."""
     img = crop_rgba
     if rig is not None:
         img = warp_rig(img, rig, t)
+    else:
+        df = displace_field(el, t, dur, crop_rgba.shape[1], crop_rgba.shape[0])
+        if df is not None:
+            hh, ww = img.shape[:2]
+            xx, yy = np.meshgrid(np.arange(ww, dtype=np.float32), np.arange(hh, dtype=np.float32))
+            img = cv2.remap(img, (xx - df[0]).astype(np.float32), (yy - df[1]).astype(np.float32),
+                            cv2.INTER_LINEAR, borderMode=cv2.BORDER_CONSTANT, borderValue=(0, 0, 0, 0))
     h, w = img.shape[:2]
     cx, cy = w / 2.0, h / 2.0
     phase = 2 * math.pi * (t / dur)
@@ -248,6 +327,9 @@ def render_frame(el, crop_rgba, rig, t, dur, cropH_norm):
         a = 1.0 - pulse * abs(math.sin(phase))
         img = img.copy()
         img[:, :, 3] = (img[:, :, 3].astype(np.float32) * a).astype(np.uint8)
+    glow = next((i for i in el.get("idle", []) if i["type"] == "glow"), None)
+    if glow:
+        img = apply_glow(img, glow, t, dur)
     return img
 
 
@@ -306,8 +388,7 @@ def main(args):
         for el in slide["elements"]:
             if args.element_id and el["id"] != args.element_id:
                 continue
-            has_idle = any(i["type"] in ("breath", "float", "sway", "pulse", "shimmer")
-                           for i in el.get("idle", []))
+            has_idle = any(i["type"] in EXPORT_IDLE for i in el.get("idle", []))
             has_rig = bool(el.get("rig") and el["rig"].get("anim", {}).get("tracks"))
             if not (has_idle or has_rig) or el.get("hidden"):
                 continue

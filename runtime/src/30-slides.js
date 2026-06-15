@@ -47,7 +47,8 @@
        a plain Sprite (preview crop) for model3d, whose texture S.Model3D swaps
        to a live three.js render once the GLB loads. */
     makeView(tex, needMesh) {
-      const hasMeshIdle = (this.spec.idle || []).some((i) => i.type === "meshWave");
+      const MESH = ["meshWave", "wave", "ripple", "swirl"];
+      const hasMeshIdle = (this.spec.idle || []).some((i) => MESH.includes(i.type));
       const is3d = this.spec.type === "model3d";
       if (this.view) { this.idleNode.removeChild(this.view); this.view.destroy(); }
       if (!is3d && (needMesh || hasMeshIdle)) {

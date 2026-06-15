@@ -14,7 +14,8 @@ ENTRANCES = {"fadeIn", "fadeUp", "fadeDown", "fadeLeft", "fadeRight", "scaleIn",
              "maskReveal", "blurIn", "drawOn", "staggerText", "none",
              "rotateIn", "scaleIn3D"}                       # 3D-model entrances
 IDLES = {"float", "pulse", "sway", "shimmer", "breath", "meshWave", "kenBurns",
-         "none", "autoRotate"}                              # autoRotate = 3D spin
+         "none", "autoRotate",                              # autoRotate = 3D spin
+         "wave", "ripple", "swirl", "glow"}                 # 2D effect pack
 TYPES = {"text", "image", "shape", "model3d"}
 CLEANUPS = {"none", "fill", "blur", "auto"}
 

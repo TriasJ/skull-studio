@@ -5,6 +5,16 @@ loose [semantic versioning](https://semver.org/) while pre-1.0.
 
 ## [Unreleased]
 
+### 2D effect pack
+- New looping idle effects on raster elements: **glow** (pulsing additive bloom via a
+  blurred halo, with colour), **wave** (single-axis sine), **ripple** (*underwater* —
+  2–3 superimposed sine waves on both axes), **swirl** (rotational twist). Mesh effects
+  reuse the `MeshPlane` path; the editor rebuilds Sprite↔mesh on toggle. Inspector
+  exposes amount/speed/period/waves/colour as relevant.
+- All four **bake into PPTX & baked-HTML video** — `render_clips.py` mirrors the JS
+  math (`displace_field` via `cv2.remap`, `apply_glow` via blur+add) with the temporal
+  term quantized to integer cycles so the clip loops seamlessly.
+
 ### Export a single element
 - Inspector **export** row (Studio): save the selected element as **PNG** or **JPG**
   (static, from its crop), or — when it has idle/rig motion — **GIF** or **MP4** (its
