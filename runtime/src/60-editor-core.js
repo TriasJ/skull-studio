@@ -24,6 +24,24 @@
       window.addEventListener("keydown", (ev) => {
         if (ev.key.toLowerCase() === "e" && !this.isTyping(ev)) this.toggle();
         if (ev.key === "Escape" && this.isOpen) this.toggle();
+        if (!this.isOpen || this.isTyping(ev)) return;
+        // copy / paste an element (with its animations) across slides
+        if ((ev.ctrlKey || ev.metaKey) && ev.key.toLowerCase() === "c" && this.selected) {
+          this._clipboard = S.deepClone(this.selected.spec);
+        } else if ((ev.ctrlKey || ev.metaKey) && ev.key.toLowerCase() === "v" && this._clipboard) {
+          ev.preventDefault();
+          this.pasteElement();
+        } else if (window.STUDIO && this.selected && ev.key.indexOf("Arrow") === 0) {
+          // nudge the selected box (Shift = larger step); Alt = snap centre to the arrow's axis
+          ev.preventDefault();
+          if (ev.altKey) {
+            this.snapCenter(ev.key === "ArrowLeft" || ev.key === "ArrowRight" ? "x" : "y");
+          } else {
+            const s = ev.shiftKey ? 0.02 : 0.005;
+            const d = { ArrowLeft: [-s, 0], ArrowRight: [s, 0], ArrowUp: [0, -s], ArrowDown: [0, s] }[ev.key];
+            if (d) this.nudgeSelected(d[0], d[1]);
+          }
+        }
       });
       const filter = document.getElementById("ed-el-filter");
       if (filter) filter.oninput = (e) => this.setFilter(e.target.value);
@@ -305,6 +323,56 @@
           body: JSON.stringify({ path: `crops/${ev.spec.id}.webp`, dataURL }) });
         if (r.ok && S.persist) { S.persist.markDirty(ev.spec.id); S.persist.saveStudio(); }
       } catch (e) { /* bake is best-effort */ }
+    }
+
+    /* keyboard nudge of the selected element's box (then re-crop to update pixels) */
+    nudgeSelected(dx, dy) {
+      const ev = this.selected;
+      if (!ev) return;
+      ev.spec.bbox = ev.spec.bbox.map((v, i) => +S.clamp(v + (i % 2 ? dy : dx), 0, 1).toFixed(4));
+      ev.relayout();
+      if (S.persist) S.persist.markDirty(ev.spec.id);
+      if (S.studio) S.studio.needsRecrop("box moved");
+      if (S.inspector) S.inspector.show(ev);
+    }
+
+    /* snap the selected element's centre to the slide centre on one axis */
+    snapCenter(axis) {
+      const ev = this.selected;
+      if (!ev) return;
+      const b = ev.spec.bbox.slice();
+      if (axis === "x") { const w = b[2] - b[0]; b[0] = +(0.5 - w / 2).toFixed(4); b[2] = +(0.5 + w / 2).toFixed(4); }
+      else { const h = b[3] - b[1]; b[1] = +(0.5 - h / 2).toFixed(4); b[3] = +(0.5 + h / 2).toFixed(4); }
+      ev.spec.bbox = b;
+      ev.relayout();
+      if (S.persist) S.persist.markDirty(ev.spec.id);
+      if (S.studio) S.studio.needsRecrop("centered");
+      if (S.inspector) S.inspector.show(ev);
+    }
+
+    /* paste a copied element onto the CURRENT slide (keeps its crop/image) */
+    pasteElement() {
+      const v = this.manager.currentView;
+      if (!v || !this._clipboard) return;
+      const spec = S.deepClone(this._clipboard);
+      let n = 1, id;
+      do { id = `${v.spec.id}_paste${n++}`; } while (v.spec.elements.some((e) => e.id === id));
+      spec.id = id;
+      spec.name = (spec.name || this._clipboard.id) + " (paste)";
+      spec.bbox = spec.bbox.map((c) => +S.clamp(c + 0.03, 0, 1).toFixed(4));
+      if (spec.cropBbox) spec.cropBbox = spec.cropBbox.map((c) => +S.clamp(c + 0.03, 0, 1).toFixed(4));
+      spec.z = Math.max(0, ...v.spec.elements.map((e) => e.z || 0)) + 1;
+      // keep spec.crop pointing at the source's image so it renders without a re-crop
+      v.spec.elements.push(spec);
+      const nev = new S.ElementView(spec, this.manager.deck);
+      nev.build().then(() => {
+        v.elementLayer.addChild(nev.parallaxNode);
+        v.elements.push(nev);
+        this.setElementInteractivity(true);
+        this.rebuildList();
+        this.select(nev);
+        if (S.persist) S.persist.markDirty(id);
+      });
     }
 
     /* swap z with the nearest neighbour above (+1) / below (-1) */

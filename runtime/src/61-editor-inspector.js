@@ -120,6 +120,13 @@
       }
       h.push(this.sec("entrance", "Entrance", entRows));
 
+      // --- effect presets (one-click entrance+idle "looks")
+      if (S.EffectPresets) {
+        h.push(this.sec("fxpresets", "Effect presets",
+          [`<div class="ed-preset-grid">` + S.EffectPresets.list.map((p) =>
+            `<button class="ed-fx" data-fx="${p.id}" title="${p.hint}" style="text-align:left">${p.label}</button>`).join("") + `</div>`]));
+      }
+
       // --- 3D model (only for model3d elements)
       if (spec.type === "model3d") {
         const m3 = spec.model3d || (spec.model3d = {});
@@ -291,6 +298,15 @@
       onchange("ent-ease", (e) => { ent.ease = e.target.value; });
       onchange("ent-dir", (e) => { ent.direction = e.target.value; });
       onchange("ent-dist", (e) => { ent.distance = parseFloat(e.target.value); });
+
+      for (const btn of this.el.querySelectorAll(".ed-fx")) {
+        btn.onclick = () => {
+          S.EffectPresets.apply(spec, btn.dataset.fx);
+          if (spec.type !== "model3d" && ev.view && ev.view.texture) ev.makeView(ev.view.texture, !!spec.rig);
+          this.commit(ev);
+          this.show(ev);
+        };
+      }
 
       // --- 3D model controls (apply live to the three.js view when loaded)
       const m3 = spec.model3d || {};

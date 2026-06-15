@@ -325,6 +325,8 @@
       { label: "OCR selected element", run: () => editor.selected && S.studio.ocrElement(editor.selected.spec).then(() => S.inspector.show(editor.selected)) },
       { label: "Reset selected element", run: () => editor.selected && S.persist && S.persist.resetElement(editor.selected.spec.id) },
       { label: "Delete selected element", kbd: "Ctrl+Del", run: () => editor.selected && editor.deleteElement(editor.selected) },
+      "-",
+      { label: "Apply background idle to all slides", run: applyBgIdleAll },
     ]));
     // 3D primitives: pick a colour, click a shape to drop it on the current slide
     const colorRow = document.createElement("div");
@@ -373,6 +375,22 @@
       if (e.ctrlKey && e.key.toLowerCase() === "s") { e.preventDefault(); S.persist.saveStudio(); }
       if (e.ctrlKey && e.key === "Delete" && editor.selected) editor.deleteElement(editor.selected);
     });
+  }
+
+  function applyBgIdleAll() {
+    const mgr = S.manager;
+    const cur = mgr && mgr.currentView;
+    if (!cur) return;
+    const idle = cur.spec.background.idle;
+    if (!confirm("Copy this slide's background idle (e.g. Ken Burns) to every slide?")) return;
+    let n = 0;
+    for (const v of mgr.views) {
+      v.spec.background.idle = idle ? JSON.parse(JSON.stringify(idle)) : null;
+      if (v.built && v.restartBgIdle) v.restartBgIdle();
+      if (S.persist) S.persist.markSlideDirty(v.spec.id);
+      n++;
+    }
+    setStatus(`background idle applied to ${n} slides`);
   }
 
   async function importMineru() {

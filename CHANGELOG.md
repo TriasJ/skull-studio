@@ -5,6 +5,16 @@ loose [semantic versioning](https://semver.org/) while pre-1.0.
 
 ## [Unreleased]
 
+### Editor QoL
+- **Arrow-key nudge** of the selected element box (Shift = bigger step; **Alt** snaps
+  its centre to the slide centre on that axis).
+- **Effect presets** — one-click "looks" (Gentle float, Neon glow, Underwater, Drift
+  in, Sparkle, Heartbeat) that set a tuned entrance + idle combo.
+- **Copy / paste elements** across slides (Ctrl+C / Ctrl+V) — keeps the element's
+  animations and image.
+- **Apply background idle to all slides** (Tools menu) — push a Ken-Burns/idle to
+  every slide at once.
+
 ### Particle system (HTML)
 - New `particles` idle effect with presets **sparkle / snow / embers / floatUp /
   bubbles** (rate + size in the inspector). A lightweight ticker-driven emitter

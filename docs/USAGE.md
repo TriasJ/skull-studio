@@ -42,6 +42,12 @@ menu bar + transport (top), rig timeline (bottom, when rigging).
 entry is **■ Background** (slide-level idle like Ken Burns). Each element shows its
 name; rename in the inspector.
 
+**Quick edits** — **arrow keys** nudge the selected box (Shift = bigger; **Alt** snaps
+its centre to the slide centre); **Ctrl+C / Ctrl+V** copy/paste an element (with its
+animations) onto another slide. **Effect presets** in the inspector apply a one-click
+look (Gentle float, Neon glow, Underwater, Drift in, Sparkle, Heartbeat). Tools ▸
+**Apply background idle to all slides** propagates a Ken-Burns/idle deck-wide.
+
 **Inspector** (per element)
 - **Name** — friendly label; kept in HTML and PPTX exports.
 - **Duplicate / ▲ Fwd / ▼ Back** — clone, or change stacking order.
