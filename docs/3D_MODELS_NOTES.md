@@ -108,6 +108,28 @@ them back to PPTX — a true round-trip, animations included.
    → Name the nodes (`root`, `spin`). (PowerPoint uses the node *index*, so names
    don't affect it — but they're required for three.js track binding.)
 
+9. **Synthetic models open zoomed-in / clipped in PowerPoint** (each shape fills its
+   whole box). The regenerated `am3d:camera`/scale didn't match the model's size:
+   model radius ~1 unit × `meterPerModelUnit=1` = ~1 m, but camera ~1.4 m at a narrow
+   32° FOV frames only ~0.4 m → ~2.6× too big.
+   → Reverse-engineered the real Hubble's proven framing: camera-z `67286916` (≈1.87 m,
+   1 m ≈ 36e6 EMU), 45° FOV, model physical radius ≈ model-units × `meterPerModelUnit`,
+   framed when radius ≈ distance × sin(fov/2). Fix: **normalize sample GLB geometry to
+   unit bounding radius** (centered) and regenerate with camera-z `67286916`, 45° FOV,
+   `meterPerModelUnit=0.5` → ~0.5 m model at 1.87 m → ~70% of frame. (Three.js is
+   unaffected — its runtime camera auto-frames from the bounding box.)
+
+### Still open / hardest part
+**3D scene-animation playback for *synthetic* models in PowerPoint is unconfirmed.**
+The XML matches PowerPoint's own structure (child-node clip, embedAnim, emph timing),
+but it can't be verified without PowerPoint, and PowerPoint may only replay embedded
+clips it imported/processed itself. The reliable path is **verbatim**: exporting a deck
+that was *imported from PowerPoint* reuses PowerPoint's own camera + animation XML
+(only shape-ids remapped), so framing and animation are PowerPoint-authored. Test
+order: real-deck round-trip first (verbatim), then the generated sample. Also recall
+3D scene animations typically only run in **Slideshow**, often on click (the timing
+sits in the interactive main sequence).
+
 ## Things to keep in mind / verify with real PowerPoint
 
 - 3D **scene animations typically only play in Slideshow mode** (F5 / Present), not

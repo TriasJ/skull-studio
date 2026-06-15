@@ -113,6 +113,23 @@ function buildGLB({ pos, nor, idx }, color, anim) {
       min[k] = Math.min(min[k], positions[i + k]);
       max[k] = Math.max(max[k], positions[i + k]);
     }
+  // center + normalize to a unit bounding radius, so one camera/scale frames every
+  // shape identically in PowerPoint (and rotation is about the model's centre)
+  const c = [(min[0] + max[0]) / 2, (min[1] + max[1]) / 2, (min[2] + max[2]) / 2];
+  let radius = 1e-6;
+  for (let i = 0; i < positions.length; i += 3)
+    radius = Math.max(radius, Math.hypot(positions[i] - c[0], positions[i + 1] - c[1], positions[i + 2] - c[2]));
+  for (let i = 0; i < positions.length; i += 3) {
+    positions[i] = (positions[i] - c[0]) / radius;
+    positions[i + 1] = (positions[i + 1] - c[1]) / radius;
+    positions[i + 2] = (positions[i + 2] - c[2]) / radius;
+  }
+  min.fill(Infinity); max.fill(-Infinity);
+  for (let i = 0; i < positions.length; i += 3)
+    for (let k = 0; k < 3; k++) {
+      min[k] = Math.min(min[k], positions[i + k]);
+      max[k] = Math.max(max[k], positions[i + k]);
+    }
 
   // pack buffer: positions | normals | indices [ | anim times | anim quats ]
   const clip = anim ? rotationClip(anim) : null;

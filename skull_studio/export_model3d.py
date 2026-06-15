@@ -103,9 +103,9 @@ def _model3d_xml(model, glb_rid, img_rid, cx, cy):
     xml = f'''<am3d:model3d xmlns:am3d="{NS['am3d']}" xmlns:a="{a}" xmlns:r="{NS['r']}" r:embed="{glb_rid}">
   <am3d:spPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="{int(cx)}" cy="{int(cy)}"/></a:xfrm>
     <a:prstGeom prst="rect"><a:avLst/></a:prstGeom></am3d:spPr>
-  <am3d:camera><am3d:pos x="0" y="0" z="50000000"/><am3d:up dx="0" dy="36000000" dz="0"/>
+  <am3d:camera><am3d:pos x="0" y="0" z="67286916"/><am3d:up dx="0" dy="36000000" dz="0"/>
     <am3d:lookAt x="0" y="0" z="0"/><am3d:perspective fov="{fov}"/></am3d:camera>
-  <am3d:trans><am3d:meterPerModelUnit n="1" d="1"/>
+  <am3d:trans><am3d:meterPerModelUnit n="500000" d="1000000"/>
     <am3d:preTrans dx="0" dy="0" dz="0"/>
     <am3d:scale><am3d:sx n="1000000" d="1000000"/><am3d:sy n="1000000" d="1000000"/><am3d:sz n="1000000" d="1000000"/></am3d:scale>
     <am3d:rot ax="{ax}" ay="{ay}" az="{az}"/>

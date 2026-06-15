@@ -84,7 +84,7 @@ def model_el(kind, bbox, clip_name, dur_ms):
         "modelSrc": f"models/{kind}.glb",
         # play the GLB's baked 3-axis "tumble" clip (loops); also round-trips to PPTX
         "model3d": {"clip": 0, "loop": True, "durationMs": dur_ms, "autoRotate": 0,
-                    "camera": {"fov": 32}, "transform": {"rot": [0.35, 0.6, 0], "scale": [1, 1, 1]},
+                    "camera": {"fov": 45}, "transform": {"rot": [0.35, 0.6, 0], "scale": [1, 1, 1]},
                     "previewSrc": None, "sourceXml": None},
     }
 
