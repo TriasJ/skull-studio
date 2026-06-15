@@ -219,7 +219,13 @@ def _add_models(m, pptx_path):
     with zipfile.ZipFile(str(pptx_path)) as z:
         names = set(z.namelist())
         for i, msl in enumerate(m["slides"]):
-            for info in models_by_slide.get(i, []):
+            entry = models_by_slide.get(i)
+            if not entry:
+                continue
+            slide_models = entry["models"]
+            if entry.get("timing"):
+                msl["model3dTiming"] = entry["timing"]   # replayed on PPTX export
+            for info in slide_models:
                 if not info.get("bbox"):
                     continue
                 z_next = max([e.get("z", 0) for e in msl["elements"]] + [0]) + 1
@@ -230,7 +236,7 @@ def _add_models(m, pptx_path):
                         written.add(part)
                 n += 1
             # OCR image regions hidden behind a model are duplicates of its preview
-            mboxes = [info["bbox"] for info in models_by_slide.get(i, []) if info.get("bbox")]
+            mboxes = [info["bbox"] for info in slide_models if info.get("bbox")]
             for oi in [e for e in msl["elements"] if e["type"] == "image"]:
                 if any(_overlaps(oi["bbox"], mb) > 0.5 for mb in mboxes):
                     msl["elements"].remove(oi)
@@ -276,6 +282,7 @@ def _model3d_el(sid, z, info):
         "transform": info.get("transform"),
         "previewSrc": f"models/{base(info['preview_part'])}" if info.get("preview_part") else None,
         "sourceXml": info.get("source_xml"),                # verbatim, for round-trip export
+        "sourceSpid": info.get("spid"),                     # original shape id, to remap timing
     }
     return el
 

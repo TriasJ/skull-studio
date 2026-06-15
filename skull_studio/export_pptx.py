@@ -311,7 +311,9 @@ def main(args):
     DIST.mkdir(exist_ok=True)
     prs.save(str(args.out))
     if models_by_slide:                 # splice real 3D models back into the saved package
-        export_model3d.inject(args.out, models_by_slide, W_emu, H_emu)
+        timing_by_slide = {i: s.get("model3dTiming") for i, s in enumerate(manifest["slides"])
+                           if s.get("model3dTiming")}
+        export_model3d.inject(args.out, models_by_slide, W_emu, H_emu, timing_by_slide)
     print(f"Exported {len(manifest['slides'])} slides -> {args.out}")
     print(f"  {n_text} text boxes, {n_pic} pictures, {n_clip} clips, {n_model3d} 3D models, "
           f"{n_patch} patch shapes, {n_anim} animations "

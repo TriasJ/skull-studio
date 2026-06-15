@@ -178,7 +178,11 @@ def _name_descr(graphic_frame):
 
 
 def parse(pptx_path):
-    """Return {slide_index(0-based): [model dict, ...]} for all 3D models."""
+    """Return {slide_index(0-based): {"models": [...], "timing": str|None}}.
+
+    ``timing`` is the slide's raw ``<p:timing>`` when it drives 3D models (so the
+    exporter can replay scene animations); each model carries its original ``spid``
+    (graphicFrame id) for remapping that timing onto the re-exported shapes."""
     out = {}
     with zipfile.ZipFile(str(pptx_path)) as z:
         SW, SH = _slide_size(z)
@@ -201,6 +205,8 @@ def parse(pptx_path):
 
                 bbox = _xfrm_bbox(gframe, SW, SH) if gframe is not None else None
                 name, descr = _name_descr(gframe) if gframe is not None else (None, None)
+                cnv = gframe.find(".//" + _q("p", "cNvPr")) if gframe is not None else None
+                spid = cnv.get("id") if cnv is not None else None
 
                 glb_rid = model.get(_q("r", "embed"))
                 glb_part = rels.get(glb_rid, (None, None))[1] if glb_rid else None
@@ -222,6 +228,7 @@ def parse(pptx_path):
                     "name": name,
                     "descr": descr,
                     "bbox": bbox,
+                    "spid": spid,
                     "glb_part": glb_part,
                     "preview_part": preview_part,
                     "camera": _parse_camera(model),
@@ -230,7 +237,13 @@ def parse(pptx_path):
                     "source_xml": etree.tostring(model, encoding="unicode"),
                 })
             if models:
-                out[idx] = models
+                # capture slide timing only when it actually targets these models
+                timing_el = root.find(".//" + _q("p", "timing"))
+                timing = etree.tostring(timing_el, encoding="unicode") if timing_el is not None else None
+                spids = {m["spid"] for m in models if m["spid"]}
+                if timing and not any(f'spid="{s}"' in timing for s in spids):
+                    timing = None
+                out[idx] = {"models": models, "timing": timing}
     return out
 
 
@@ -238,6 +251,8 @@ if __name__ == "__main__":  # manual probe: python -m skull_studio.extract_model
     import json
     import sys
     res = parse(sys.argv[1])
-    summary = {str(k): [{kk: vv for kk, vv in m.items() if kk != "source_xml"} for m in v]
+    summary = {str(k): {"timing": bool(v["timing"]),
+                        "models": [{kk: vv for kk, vv in m.items() if kk != "source_xml"}
+                                   for m in v["models"]]}
                for k, v in res.items()}
     print(json.dumps(summary, indent=2))

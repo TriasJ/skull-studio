@@ -114,42 +114,28 @@ const manifestJson = JSON.stringify(manifest).replace(/<\//g, "<\\/");
 sizes.manifest = manifestJson.length;
 
 // ---- three.js (only for decks with 3D models) --------------------------------
-// three.js is ESM-only, so it loads via an import map + a tiny bootstrap module
-// that assigns window.THREE (read lazily by the classic-script runtime). The map
-// targets are data: URLs (inline) or sidecar files (vendor); GLTFLoader's one
-// relative import was rewritten to a mapped specifier in fetch_libs.mjs.
+// Classic global scripts (three.min.js + classic GLTFLoader), so 3D works even
+// from file://. "inline" embeds the source in <script> tags (one portable file);
+// "vendor" writes them beside the HTML and references them with <script src>.
 const OUT_DIR = dirname(OUT_PATH);
 let threeHtml = "";
 if (hasModels) {
   const vroot = join(ROOT, "runtime", "vendor");
-  const files = { three: "three.module.min.js", bgu: "three.BufferGeometryUtils.js", gltf: "three.GLTFLoader.js" };
-  sizes.three = Object.values(files).reduce((n, f) => n + statSync(join(vroot, f)).size, 0);
-  let urls;
+  const files = ["three.min.js", "three.GLTFLoader.js"];   // order matters: core first
+  sizes.three = files.reduce((n, f) => n + statSync(join(vroot, f)).size, 0);
   if (THREEJS_MODE === "inline") {
-    const dataUrl = (f) => "data:text/javascript;base64," + readFileSync(join(vroot, f)).toString("base64");
-    urls = { three: dataUrl(files.three), bgu: dataUrl(files.bgu), gltf: dataUrl(files.gltf) };
+    for (const f of files) {
+      const src = readFileSync(join(vroot, f), "utf-8").replace(/<\/script/gi, "<\\/script");
+      threeHtml += `<script>/* ${f} */\n${src}\n</script>\n`;
+    }
   } else {
     const vout = join(OUT_DIR, "vendor");
     mkdirSync(vout, { recursive: true });
-    for (const f of Object.values(files)) copyFileSync(join(vroot, f), join(vout, f));
-    // import-map values must be real URLs (./ , / or absolute) -- a bare
-    // "vendor/x.js" is treated as a bare specifier and ignored
-    urls = { three: "./vendor/" + files.three, bgu: "./vendor/" + files.bgu, gltf: "./vendor/" + files.gltf };
+    for (const f of files) {
+      copyFileSync(join(vroot, f), join(vout, f));
+      threeHtml += `<script src="vendor/${f}"></script>\n`;
+    }
   }
-  const importmap = JSON.stringify({ imports: {
-    "three": urls.three,
-    "three/addons/BufferGeometryUtils.js": urls.bgu,
-    "three/addons/GLTFLoader.js": urls.gltf,
-  } });
-  threeHtml =
-    `<script type="importmap">${importmap}</script>\n` +
-    `<script type="module">\n` +
-    `import * as THREE from 'three';\n` +
-    `import { GLTFLoader } from 'three/addons/GLTFLoader.js';\n` +
-    // the import namespace is read-only -> copy into a plain global, add the loader
-    `window.THREE = Object.assign({}, THREE, { GLTFLoader });\n` +
-    `window.dispatchEvent(new Event('three-ready'));\n` +
-    `</script>\n`;
 }
 
 // GLBs ride beside the HTML unless embedded; the runtime fetches "models/*.glb"

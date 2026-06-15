@@ -18,9 +18,13 @@ loose [semantic versioning](https://semver.org/) while pre-1.0.
 - **Editor:** a *3D model* inspector section (animation clip, loop, auto-rotate,
   camera FOV), applied live.
 - **Export:** true round-trip — models are spliced back into the exported `.pptx`
-  (`mc:Choice` 3D model + `mc:Fallback` preview), verbatim when unedited.
-- **three.js delivery** is an export choice: *inline* (one self-contained file)
-  or *vendor* (small HTML + a `vendor/` folder); included only for 3D decks.
+  (`mc:Choice` 3D model + `mc:Fallback` preview), verbatim when unedited, and the
+  slide's 3D **scene animations replay** (original `<p:timing>` captured on import
+  and re-emitted with shape-ids remapped). Reopens without a "repair" prompt.
+- **three.js** is pinned to r137 (last UMD/global build) and shipped as classic
+  `<script>` so 3D works even from `file://`. Delivery is an export choice: *inline*
+  or *vendor* folder; with *embed 3D models* the whole deck is one double-clickable
+  file. Included only for decks that contain 3D.
 - New: `skull_studio/extract_model3d.py`, `export_model3d.py`,
   `runtime/src/51-model3d.js`, `make_sample_glb.mjs`, `make_sample_3d.py`.
 

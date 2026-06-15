@@ -19,15 +19,9 @@
   const DPR = Math.min(window.devicePixelRatio || 1, 2);
   const MAX_PX = 1024;                 // cap the render-target's longest side
 
-  function threeReady() {
-    if (window.THREE) return Promise.resolve(window.THREE);
-    return new Promise((resolve) => {
-      let done = false;
-      const fin = () => { if (!done) { done = true; resolve(window.THREE || null); } };
-      window.addEventListener("three-ready", fin, { once: true });
-      setTimeout(fin, 10000);          // give up gracefully -> stay on preview
-    });
-  }
+  // three.min.js loads as a classic global before the runtime, so THREE is ready
+  // synchronously; null when the deck has no 3D build (element stays on preview).
+  function threeReady() { return Promise.resolve(window.THREE || null); }
 
   function modelURL(src) {
     return (window.ASSETS || {})[src] ||
@@ -95,7 +89,12 @@
         canvas, alpha: true, antialias: true, preserveDrawingBuffer: true,
       });
       this.renderer.setClearColor(0x000000, 0);
-      if ("outputColorSpace" in this.renderer) this.renderer.outputColorSpace = THREE.SRGBColorSpace;
+      // correct sRGB output across three versions (r152+ vs the pinned r137)
+      if ("outputColorSpace" in this.renderer && THREE.SRGBColorSpace) {
+        this.renderer.outputColorSpace = THREE.SRGBColorSpace;
+      } else if ("outputEncoding" in this.renderer && THREE.sRGBEncoding) {
+        this.renderer.outputEncoding = THREE.sRGBEncoding;
+      }
 
       this.scene = new THREE.Scene();
       this.root = gltf.scene;
@@ -137,12 +136,13 @@
     }
 
     _lights(THREE) {
-      // model-agnostic studio lighting; MS exports look right under a key + fill
-      this.scene.add(new THREE.HemisphereLight(0xffffff, 0x444455, 2.2));
-      const key = new THREE.DirectionalLight(0xffffff, 2.6);
+      // model-agnostic studio lighting (tuned for r137's legacy intensity scale,
+      // where 1.0 ~= full; keep it gentle so bright materials don't blow out)
+      this.scene.add(new THREE.HemisphereLight(0xffffff, 0x404550, 0.95));
+      const key = new THREE.DirectionalLight(0xffffff, 1.15);
       key.position.set(1, 2, 3);
       this.scene.add(key);
-      const fill = new THREE.DirectionalLight(0xbfd0ff, 0.8);
+      const fill = new THREE.DirectionalLight(0xbfd0ff, 0.35);
       fill.position.set(-2, -1, 1);
       this.scene.add(fill);
     }

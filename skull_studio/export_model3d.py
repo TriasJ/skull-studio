@@ -102,10 +102,10 @@ def _model3d_xml(model, glb_rid, img_rid, cx, cy):
     <am3d:postTrans dx="0" dy="0" dz="0"/></am3d:trans>
   <am3d:raster rName="Office3DRenderer" rVer="16.0.8326"><am3d:blip r:embed="{img_rid}"/></am3d:raster>
   <am3d:objViewport viewportSz="{vp}"/>
-  <am3d:ambientLight><am3d:clr><a:scrgbClr r="50000" g="50000" b="50000"/></am3d:clr>
-    <am3d:illuminance n="1000000" d="1000000"/></am3d:ambientLight>
+  <am3d:ambientLight><am3d:clr><a:scrgbClr r="55000" g="55000" b="55000"/></am3d:clr>
+    <am3d:illuminance n="550000" d="1000000"/></am3d:ambientLight>
   <am3d:ptLight rad="0"><am3d:clr><a:scrgbClr r="100000" g="100000" b="100000"/></am3d:clr>
-    <am3d:intensity n="9765625" d="1000000"/><am3d:pos x="21959998" y="70920001" z="16344003"/></am3d:ptLight>
+    <am3d:intensity n="2600000" d="1000000"/><am3d:pos x="21959998" y="70920001" z="16344003"/></am3d:ptLight>
 </am3d:model3d>'''
     return etree.fromstring(xml.encode("utf-8"))
 
@@ -169,10 +169,29 @@ def _ensure_content_types(xml_bytes):
     return etree.tostring(root, xml_declaration=True, encoding="UTF-8", standalone=True)
 
 
-def inject(pptx_path, models_by_slide, W_emu, H_emu):
+def _replay_timing(slide_root, timing_xml, spidmap):
+    """Re-attach the original 3D-scene-animation <p:timing>, with shape ids
+    remapped onto the re-exported shapes. Reusing PowerPoint's own timing verbatim
+    (only the spids change) is what makes the animations play again on round-trip.
+    Replaces any existing timing (one <p:timing> per slide is the schema rule)."""
+    if not timing_xml or not spidmap:
+        return
+    # two-phase replace so overlapping old/new id ranges can't clobber each other
+    for i, old in enumerate(spidmap):
+        timing_xml = timing_xml.replace(f'spid="{old}"', f'spid="\x00{i}\x00"')
+    for i, old in enumerate(spidmap):
+        timing_xml = timing_xml.replace(f'spid="\x00{i}\x00"', f'spid="{spidmap[old]}"')
+    for ex in slide_root.findall(_q("p", "timing")):
+        slide_root.remove(ex)
+    slide_root.append(etree.fromstring(timing_xml.encode("utf-8")))
+
+
+def inject(pptx_path, models_by_slide, W_emu, H_emu, timing_by_slide=None):
     """Splice 3D models into the saved package. models_by_slide:
-    {slide_index: [ {bbox, id, name, text, glb(Path), preview(Path|None), model3d{...}} ]}."""
+    {slide_index: [ {bbox, id, name, text, glb(Path), preview(Path|None), model3d{...}} ]}.
+    timing_by_slide: {slide_index: raw <p:timing> XML} to replay scene animations."""
     pptx_path = Path(pptx_path)
+    timing_by_slide = timing_by_slide or {}
     with zipfile.ZipFile(str(pptx_path)) as z:
         members = {n: z.read(n) for n in z.namelist()}
 
@@ -191,6 +210,7 @@ def inject(pptx_path, models_by_slide, W_emu, H_emu):
         rels_root = (etree.fromstring(members[rpart]) if rpart in members else
                      etree.fromstring(f'<Relationships xmlns="{NS["rel"]}"/>'.encode()))
         shape_id = _next_shape_id(sptree)
+        spidmap = {}                                  # original spid -> new spid
 
         for model in models:
             glb_name = f"ppt/media/model3d{glb_k}.glb"; glb_k += 1
@@ -204,6 +224,9 @@ def inject(pptx_path, models_by_slide, W_emu, H_emu):
             img_rid = f"rId{_next_rid(rels_root)}"
             _add_rel(rels_root, img_rid, IMAGE_REL, f"../media/{Path(img_name).name}")
 
+            old_spid = (model.get("model3d") or {}).get("sourceSpid")
+            if old_spid:
+                spidmap[str(old_spid)] = str(shape_id)
             alt = _alt_content(model, glb_rid, img_rid, shape_id, W_emu, H_emu)
             shape_id += 1
             ext = sptree.find(_q("p", "extLst"))      # keep extLst last if present
@@ -211,6 +234,8 @@ def inject(pptx_path, models_by_slide, W_emu, H_emu):
                 ext.addprevious(alt)
             else:
                 sptree.append(alt)
+
+        _replay_timing(slide_root, timing_by_slide.get(sidx), spidmap)
 
         members[spart] = etree.tostring(slide_root, xml_declaration=True,
                                         encoding="UTF-8", standalone=True)

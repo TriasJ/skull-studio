@@ -118,18 +118,24 @@ as a `model3d` element.
   you can add spin. Select the model and use the **3D model** inspector section:
   *clip* (baked animation), *loop*, *auto-rotate °/s*, *camera FOV*.
 - **Export → HTML** offers a *three.js* choice: **inline** (one self-contained
-  file, ~0.7 MB heavier) or **vendor folder** (smaller HTML + a `vendor/` folder
+  file, ~0.6 MB heavier) or **vendor folder** (smaller HTML + a `vendor/` folder
   beside it); *embed 3D models* base64s the `.glb` for a true single file,
   otherwise they ride in a `models/` folder. three.js is added only when the deck
   actually contains 3D.
-- **Export → PowerPoint** writes the models back as real 3D (a round-trip);
-  PowerPoint shows the live model, other apps show the preview.
+  - **To open by double-clicking (`file://`)**, tick *embed 3D models* and keep
+    three.js *inline* — then engine + models live inside the page. With sidecar
+    models or the vendor folder the browser blocks the file-to-file requests, so
+    **serve the deck over http** instead (`python -m http.server`, or run
+    `skull-studio`). 2D-only decks always work from `file://`.
+- **Export → PowerPoint** writes the models back as real 3D, **including their
+  scene animations** (a true round-trip); PowerPoint shows the live animated model,
+  other apps show the preview.
 
 Try it without PowerPoint:
 
 ```bash
-node skull_studio/make_sample_glb.mjs     # sphere/cone/torus -> sample/models
-python -m skull_studio.make_sample_3d     # assemble a 1-slide deck in work/
-node skull_studio/build.mjs               # dist/presentation.html (live 3D)
-python -m skull_studio.export_pptx dist/sample3d.pptx   # round-trip
+node skull_studio/make_sample_glb.mjs           # sphere/cone/torus -> sample/models
+python -m skull_studio.make_sample_3d           # assemble a 1-slide deck in work/
+node skull_studio/build.mjs --embed-models      # dist/presentation.html — one file, opens from disk
+python -m skull_studio.export_pptx dist/sample3d.pptx   # round-trip back to PowerPoint
 ```

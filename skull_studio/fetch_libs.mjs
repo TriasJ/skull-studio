@@ -7,7 +7,12 @@ const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 const VENDOR = join(ROOT, "runtime", "vendor");
 mkdirSync(VENDOR, { recursive: true });
 
-const THREE_VER = "0.169.0";  // three.js is ESM-only; loaded via import map (see build.mjs)
+// three.js r137 is the last release with a UMD global build + a classic
+// (non-module) GLTFLoader. We pin it on purpose: a classic <script> global
+// works when the exported HTML is opened straight from disk (file://), whereas
+// modern three is ESM-only and browsers block ES-module loading over file://.
+// GLB loading + AnimationMixer are rock-solid at r137.
+const THREE_VER = "0.137.0";
 const THREE_CDN = `https://cdn.jsdelivr.net/npm/three@${THREE_VER}`;
 
 const LIBS = [
@@ -23,30 +28,21 @@ const LIBS = [
     probe: "gsap",
     minBytes: 30_000,
   },
-  // --- three.js trio (optional; only inlined into decks that contain 3D) -----
-  // ESM modules. They use bare import specifiers ("three", and -- after the
-  // patch below -- "three/addons/BufferGeometryUtils.js") so the build can wire
-  // them up with an import map whether inlined (data: URLs) or vendored as files.
+  // --- three.js (optional; only inlined into decks that contain 3D) ----------
+  // Classic UMD/global scripts: three.min.js defines window.THREE, the classic
+  // GLTFLoader attaches THREE.GLTFLoader. Both run as plain <script> (no modules
+  // / import maps), so 3D works even from file://.
   {
-    name: "three.module.min.js",
-    url: `${THREE_CDN}/build/three.module.min.js`,
+    name: "three.min.js",
+    url: `${THREE_CDN}/build/three.min.js`,
     probe: "WebGLRenderer",
     minBytes: 400_000,
   },
   {
-    name: "three.BufferGeometryUtils.js",
-    url: `${THREE_CDN}/examples/jsm/utils/BufferGeometryUtils.js`,
-    probe: "toTrianglesDrawMode",
-    minBytes: 10_000,
-  },
-  {
     name: "three.GLTFLoader.js",
-    url: `${THREE_CDN}/examples/jsm/loaders/GLTFLoader.js`,
-    probe: "class GLTFLoader",
+    url: `${THREE_CDN}/examples/js/loaders/GLTFLoader.js`,
+    probe: "GLTFLoader",
     minBytes: 50_000,
-    // rewrite the one relative import so the module resolves via the import map
-    transform: (t) => t.replace("'../utils/BufferGeometryUtils.js'",
-                                "'three/addons/BufferGeometryUtils.js'"),
   },
 ];
 

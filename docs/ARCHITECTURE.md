@@ -129,13 +129,20 @@ raw package.
 - **Runtime** — `51-model3d.js`: each model gets its own offscreen three.js
   `WebGLRenderer`; its canvas is a `PIXI.Texture` used as the element's `view`, so
   the existing scene graph composites it (one-writer rule unchanged). `AnimationMixer`
-  plays `gltf.animations[clip]`. three.js is ESM-only, loaded via an import map +
-  a bootstrap module that sets `window.THREE` (read lazily by the classic runtime).
+  plays `gltf.animations[clip]`. three.js is pinned to **r137** — the last version
+  with a UMD global build + a classic (non-module) GLTFLoader — loaded as plain
+  `<script>` globals (`window.THREE`), so 3D works even from `file://` (browsers
+  block ES-module loading over `file://`).
 - **Export** — `export_model3d.inject()` post-processes the saved `.pptx` zip:
   adds the GLB + preview as parts, wires slide rels (`…/2017/06/relationships/model3d`),
   and splices `mc:AlternateContent` back in (verbatim `sourceXml` with embed ids
-  repointed, or a regenerated minimal `am3d:model3d` from the manifest). True
-  round-trip; reopens in PowerPoint without "repair".
+  repointed, or a regenerated full `am3d:model3d` from the manifest). The original
+  slide `<p:timing>` is captured at import (`slide.model3dTiming`) and replayed with
+  shape-ids remapped, so 3D scene animations play again. Reopens in PowerPoint
+  without "repair".
 - **Build** — `build.mjs` includes three.js only for decks with `model3d` elements:
-  `--threejs inline` (data: URLs in one file) or `--threejs vendor` (sidecar
-  `vendor/` folder); GLBs ride in a `models/` folder unless `--embed-models`.
+  `--threejs inline` (embedded `<script>`, one file) or `--threejs vendor` (sidecar
+  `vendor/` folder). GLBs ride in a `models/` folder unless `--embed-models`.
+  **For a double-clickable single file (`file://`), use inline three + `--embed-models`**
+  so engine and models are both in the page (no sibling-file `fetch`, which `file://`
+  blocks). Large decks are better served over http.
