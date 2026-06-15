@@ -266,6 +266,7 @@
     dd.className = "dd";
     for (const it of items) {
       if (it === "-") { dd.appendChild(document.createElement("hr")); continue; }
+      if (it.node) { dd.appendChild(it.node); continue; }   // custom control (e.g. colour picker)
       const b = document.createElement("button");
       b.innerHTML = it.label + (it.kbd ? `<span class="kbd">${it.kbd}</span>` : "");
       if (it.tool) { b.classList.add("tool"); b.dataset.tool = it.tool; }
@@ -307,6 +308,21 @@
       "-",
       { label: "OCR selected element", run: () => editor.selected && S.studio.ocrElement(editor.selected.spec).then(() => S.inspector.show(editor.selected)) },
       { label: "Delete selected element", kbd: "Ctrl+Del", run: () => editor.selected && editor.deleteElement(editor.selected) },
+    ]));
+    // 3D primitives: pick a colour, click a shape to drop it on the current slide
+    const colorRow = document.createElement("div");
+    colorRow.style.cssText = "padding:5px 10px";
+    const colorInput = document.createElement("input");
+    colorInput.type = "color"; colorInput.value = "#3aa0eb";
+    colorInput.style.cssText = "width:100%;height:24px;background:#101014;border:1px solid #444;border-radius:4px;padding:0";
+    colorRow.innerHTML = "<div style='color:#999;margin-bottom:3px;font-size:11px'>colour</div>";
+    colorRow.appendChild(colorInput);
+    const PRIMS = ["plane", "cube", "sphere", "cylinder", "cone", "torus"];
+    bar.appendChild(menu("3D", [
+      { node: colorRow },
+      "-",
+      ...PRIMS.map((s) => ({ label: "Add " + s.charAt(0).toUpperCase() + s.slice(1),
+        run: () => editor.addPrimitive(s, colorInput.value) })),
     ]));
     bar.appendChild(menu("Options", [
       { label: "Deck options…", run: openOptions },

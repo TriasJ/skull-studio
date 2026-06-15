@@ -288,6 +288,10 @@ def editor_page():
     html = (RUNTIME / "template.html").read_text(encoding="utf-8")
     vendor = ('<script src="/runtime/vendor/pixi.min.js"></script>\n'
               '<script src="/runtime/vendor/gsap.min.js"></script>')
+    # three.js (classic globals) so 3D models render live in the editor
+    if (RUNTIME / "vendor" / "three.min.js").exists():
+        vendor += ('\n<script src="/runtime/vendor/three.min.js"></script>'
+                   '\n<script src="/runtime/vendor/three.GLTFLoader.js"></script>')
     src_tags = "\n".join(f'<script src="/runtime/src/{f.name}"></script>'
                          for f in sorted((RUNTIME / "src").glob("*.js")))
     html = (html
@@ -394,6 +398,49 @@ class Handler(BaseHTTPRequestHandler):
                 if err:
                     return self._send(400, {"error": err})
                 return self._send(200, {"text": text})
+            except Exception as e:
+                return self._send(400, {"error": str(e)})
+        if path == "/api/add3d":
+            # editor "Add 3D": generate a coloured primitive GLB into work/models/
+            import re
+            try:
+                req = json.loads(body.decode("utf-8"))
+            except Exception as e:
+                return self._send(400, {"error": str(e)})
+            shape = str(req.get("shape", ""))
+            color = str(req.get("color", "#8899aa"))
+            if shape not in {"plane", "cube", "sphere", "cylinder", "cone", "torus"}:
+                return self._send(400, {"error": "unknown shape"})
+            if not re.fullmatch(r"#?[0-9a-fA-F]{6}", color):
+                color = "#8899aa"
+            models = WORK / "models"
+            models.mkdir(parents=True, exist_ok=True)
+            n = 1
+            while (models / f"prim_{n}.glb").exists():
+                n += 1
+            out = models / f"prim_{n}.glb"
+            r = subprocess.run(["node", str(SCRIPTS / "make_sample_glb.mjs"), "one", shape, color, str(out)],
+                               cwd=ROOT, capture_output=True, text=True)
+            if r.returncode != 0 or not out.exists():
+                return self._send(500, {"error": "glb generation failed: " + (r.stderr or r.stdout)[:200]})
+            return self._send(200, {"modelSrc": f"models/{out.name}"})
+        if path == "/api/asset":
+            # save a base64 data-URL into work/ (crops|models only) - used to persist
+            # a primitive's rendered preview so PPTX export can bake it as a picture
+            import base64
+            try:
+                req = json.loads(body.decode("utf-8"))
+                rel = str(req.get("path", ""))
+                durl = str(req.get("dataURL", ""))
+                if (not (rel.startswith("crops/") or rel.startswith("models/"))) or ".." in rel:
+                    return self._send(400, {"error": "bad asset path"})
+                data = base64.b64decode(durl.split(",", 1)[1] if "," in durl else durl)
+                dest = (WORK / rel).resolve()
+                if not str(dest).startswith(str(WORK.resolve())):
+                    return self._send(400, {"error": "path escape"})
+                dest.parent.mkdir(parents=True, exist_ok=True)
+                dest.write_bytes(data)
+                return self._send(200, {"saved": True, "path": rel})
             except Exception as e:
                 return self._send(400, {"error": str(e)})
         if path == "/api/run":

@@ -5,6 +5,16 @@ loose [semantic versioning](https://semver.org/) while pre-1.0.
 
 ## [Unreleased]
 
+### 3D primitives in the editor
+- New **3D** menu in the editor: add a coloured **plane / cube / sphere / cylinder /
+  cone / torus** to the current slide. Generated server-side as a glTF primitive,
+  rendered live in three.js, tunable in the inspector (clip/loop/auto-rotate/FOV).
+- **Export rule:** real imported 3D models (carry PowerPoint's own XML) round-trip as
+  live, animated 3D; synthetic models (editor primitives, generated samples) **bake to
+  a picture** on PPTX export — because PowerPoint only displays 3D it imported itself,
+  so baking guarantees they appear (live 3D remains in the HTML export). This also
+  fixes generated-sample models not showing in PowerPoint slideshow.
+
 ### 3D models (PowerPoint → three.js, round-trip)
 - **Import** inserted PowerPoint 3D models (`am3d:model3d`). Each becomes a
   `model3d` element: the GLB is extracted to `work/models/`, and camera,

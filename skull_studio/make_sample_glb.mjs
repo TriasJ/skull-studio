@@ -71,6 +71,61 @@ function torus(R = 1, r = 0.4, tseg = 48, pseg = 24) {
   return { pos, nor, idx };
 }
 
+function plane(s = 1) {
+  const pos = [], nor = [], idx = [];
+  for (const p of [[-s, -s, 0], [s, -s, 0], [s, s, 0], [-s, s, 0]]) { pos.push(...p); nor.push(0, 0, 1); }
+  idx.push(0, 1, 2, 0, 2, 3);
+  return { pos, nor, idx };
+}
+
+function cube(s = 1) {
+  const pos = [], nor = [], idx = [];
+  const faces = [
+    [[0, 0, 1], [[-s, -s, s], [s, -s, s], [s, s, s], [-s, s, s]]],
+    [[0, 0, -1], [[s, -s, -s], [-s, -s, -s], [-s, s, -s], [s, s, -s]]],
+    [[1, 0, 0], [[s, -s, s], [s, -s, -s], [s, s, -s], [s, s, s]]],
+    [[-1, 0, 0], [[-s, -s, -s], [-s, -s, s], [-s, s, s], [-s, s, -s]]],
+    [[0, 1, 0], [[-s, s, s], [s, s, s], [s, s, -s], [-s, s, -s]]],
+    [[0, -1, 0], [[-s, -s, -s], [s, -s, -s], [s, -s, s], [-s, -s, s]]],
+  ];
+  let b = 0;
+  for (const [n, cs] of faces) {
+    for (const c of cs) { pos.push(...c); nor.push(...n); }
+    idx.push(b, b + 1, b + 2, b, b + 2, b + 3); b += 4;
+  }
+  return { pos, nor, idx };
+}
+
+function cylinder(r = 1, h = 2, seg = 48) {
+  const pos = [], nor = [], idx = [], half = h / 2;
+  for (let i = 0; i <= seg; i++) {
+    const t = (i / seg) * Math.PI * 2, cx = Math.cos(t), cz = Math.sin(t);
+    pos.push(r * cx, half, r * cz); nor.push(cx, 0, cz);
+    pos.push(r * cx, -half, r * cz); nor.push(cx, 0, cz);
+  }
+  for (let i = 0; i < seg; i++) { const a = i * 2; idx.push(a, a + 1, a + 2, a + 1, a + 3, a + 2); }
+  for (const [y, ny, flip] of [[half, 1, false], [-half, -1, true]]) {
+    const base = pos.length / 3;
+    pos.push(0, y, 0); nor.push(0, ny, 0);
+    for (let i = 0; i <= seg; i++) { const t = (i / seg) * Math.PI * 2; pos.push(r * Math.cos(t), y, r * Math.sin(t)); nor.push(0, ny, 0); }
+    for (let i = 0; i < seg; i++) flip ? idx.push(base, base + 1 + i, base + 2 + i) : idx.push(base, base + 2 + i, base + 1 + i);
+  }
+  return { pos, nor, idx };
+}
+
+// named primitive builders (used by the editor's "Add 3D" menu)
+const SHAPES = {
+  plane: () => plane(1), cube: () => cube(0.9), sphere: () => sphere(1),
+  cylinder: () => cylinder(0.8, 2), cone: () => cone(1, 2), torus: () => torus(1, 0.4),
+};
+
+function hexToRGB(hex) {
+  const m = /^#?([0-9a-f]{6})$/i.exec(hex || "");
+  if (!m) return [0.6, 0.6, 0.65];
+  const n = parseInt(m[1], 16);
+  return [((n >> 16) & 255) / 255, ((n >> 8) & 255) / 255, (n & 255) / 255];
+}
+
 // ---- minimal GLB writer -------------------------------------------------------
 function pad4(n) { return (4 - (n % 4)) % 4; }
 
@@ -195,6 +250,19 @@ function buildGLB({ pos, nor, idx }, color, anim) {
   const bHead = Buffer.alloc(8);
   bHead.writeUInt32LE(bin.length, 0); bHead.writeUInt32LE(0x004e4942, 4);  // "BIN\0"
   return Buffer.concat([header, jHead, json, bHead, bin]);
+}
+
+// single-primitive mode (editor "Add 3D"): node make_sample_glb.mjs one <shape> <#color> <outPath>
+if (process.argv[2] === "one") {
+  const shape = process.argv[3], color = hexToRGB(process.argv[4]), out = process.argv[5];
+  if (!SHAPES[shape] || !out) {
+    console.error(`usage: make_sample_glb.mjs one <${Object.keys(SHAPES).join("|")}> <#rrggbb> <out.glb>`);
+    process.exit(2);
+  }
+  mkdirSync(dirname(out), { recursive: true });
+  writeFileSync(out, buildGLB(SHAPES[shape](), color, null));   // static; spin via the editor
+  console.log(`${shape} -> ${out}`);
+  process.exit(0);
 }
 
 const outDir = process.argv[2] ||

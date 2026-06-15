@@ -109,6 +109,12 @@ single-file editor saves to browser localStorage; **Export overrides.json** then
 
 ## 3D models (PowerPoint)
 
+**Add your own primitives:** the editor's **3D** menu drops a coloured **plane,
+cube, sphere, cylinder, cone,** or **torus** onto the current slide (pick a colour,
+click a shape). They render live in 3D and you can tune clip/loop/auto-rotate/FOV in
+the inspector. On PPTX export they **bake to a picture** (PowerPoint only displays 3D
+it imported itself), while real imported models round-trip as live 3D.
+
 Decks created with **Insert → 3D Models** import automatically — each model lands
 as a `model3d` element.
 

@@ -237,6 +237,65 @@
       });
     }
 
+    /* add a parametric 3D primitive (studio): server generates a coloured GLB,
+       we drop a model3d element on the current slide and render it live. On PPTX
+       export it bakes to a picture (synthetic 3D doesn't display in PowerPoint). */
+    async addPrimitive(shape, color) {
+      const v = this.manager.currentView;
+      if (!v) return;
+      let res, data;
+      try {
+        res = await fetch("/api/add3d", { method: "POST", headers: { "content-type": "application/json" },
+          body: JSON.stringify({ shape, color }) });
+        data = await res.json();
+      } catch (e) { data = { error: String(e) }; }
+      if (!res || !res.ok || !data.modelSrc) { alert("Add 3D failed: " + ((data && data.error) || "")); return; }
+
+      let n = 1, id;
+      do { id = `${v.spec.id}_3d${n++}`; } while (v.spec.elements.some((e) => e.id === id));
+      const name = shape.charAt(0).toUpperCase() + shape.slice(1);
+      const spec = {
+        id, type: "model3d", role: "figure", name, text: "",
+        bbox: [0.38, 0.30, 0.62, 0.74], cropBbox: null,
+        crop: `crops/${id}.webp`,                 // filled in by _bakePrimitive
+        z: Math.max(0, ...v.spec.elements.map((e) => e.z || 0)) + 1,
+        cleanup: "none", fillColor: null, patch: null,
+        entrance: { type: "scaleIn", delay: 0.15, duration: 0.8, ease: "back.out(1.4)" },
+        idle: [], parallax: 0.05, lines: null, rig: null, blendMode: null, opacity: 1, hidden: false,
+        modelSrc: data.modelSrc,
+        model3d: { clip: null, loop: true, durationMs: null, autoRotate: 24, camera: { fov: 45 },
+                   transform: { rot: [0.4, 0.6, 0], scale: [1, 1, 1] }, previewSrc: null, sourceXml: null },
+      };
+      v.spec.elements.push(spec);
+      const nev = new S.ElementView(spec, this.manager.deck);
+      await nev.build();
+      v.elementLayer.addChild(nev.parallaxNode);
+      v.elements.push(nev);
+      nev.startIdles();                           // begin rendering + auto-rotate
+      this.setElementInteractivity(true);
+      this.rebuildList();
+      this.select(nev);
+      if (S.persist) S.persist.markDirty(id);
+      this._bakePrimitive(nev);
+    }
+
+    /* capture the live three.js render as the element's crop, so PPTX export can
+       bake the primitive to a picture (and it shows a real render pre-load) */
+    async _bakePrimitive(ev) {
+      for (let i = 0; i < 80 && !(ev.model3d && ev.model3d.ready); i++) await new Promise((r) => setTimeout(r, 100));
+      const m = ev.model3d;
+      if (!m || !m.ready || !m.renderer) return;
+      m._frame(0);
+      let dataURL;
+      try { dataURL = m.renderer.domElement.toDataURL("image/webp", 0.92); }
+      catch (e) { try { dataURL = m.renderer.domElement.toDataURL("image/png"); } catch (_) { return; } }
+      try {
+        const r = await fetch("/api/asset", { method: "POST", headers: { "content-type": "application/json" },
+          body: JSON.stringify({ path: `crops/${ev.spec.id}.webp`, dataURL }) });
+        if (r.ok && S.persist) { S.persist.markDirty(ev.spec.id); S.persist.saveStudio(); }
+      } catch (e) { /* bake is best-effort */ }
+    }
+
     /* swap z with the nearest neighbour above (+1) / below (-1) */
     nudgeZ(ev, dir) {
       const v = this.manager.currentView;

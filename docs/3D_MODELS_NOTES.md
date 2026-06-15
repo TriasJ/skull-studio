@@ -149,6 +149,29 @@ timing lives in the interactive main sequence.)
   `docId` re-applies them. Hard-refresh / clear site data if a viewer shows stale
   edits. (Disk/export are unaffected — they read `work/manifest.json`.)
 
+## Editor "Add 3D" primitives (plane / cube / sphere / cylinder / cone / torus)
+
+The editor's **3D** menu drops a parametric, coloured primitive onto the current
+slide. Flow:
+- `make_sample_glb.mjs one <shape> <#color> <out.glb>` generates the GLB (the same
+  dependency-free generator used for the sample); the studio serves it via
+  `POST /api/add3d` into `work/models/prim_N.glb`.
+- The editor adds a `model3d` element (no `sourceXml` — it's synthetic) and renders
+  it **live in three.js** (auto-rotates; the inspector tunes clip/loop/auto-rotate/FOV).
+- It captures the live render to a WebP via `POST /api/asset` → `work/crops/<id>.webp`.
+  That crop is the **bake**.
+
+**Export rule (the key decision):** `model3d` *with* `sourceXml` → real 3D
+round-trip (verbatim, animates in PowerPoint — confirmed). `model3d` *without*
+`sourceXml` (editor primitives, generated samples) → **baked to a picture** from the
+crop. This is deliberate: PowerPoint won't display/animate 3D it didn't import itself,
+so a synthetic primitive injected as `am3d:model3d` shows up zoomed/blank and inert
+(caveats 7 & 9). Baking the rendered image guarantees it appears correctly in
+PowerPoint — losing interactivity there, but it's live 3D in the HTML export.
+
+This also resolved the sample deck's "models don't show in slideshow": synthetic
+samples now bake to pictures instead of being injected as (non-displaying) 3D.
+
 ## Non-goals (deliberately out of scope)
 
 - Editing model geometry/materials (we pose/animate/clip-select and round-trip, not model).
