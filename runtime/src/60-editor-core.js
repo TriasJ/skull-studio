@@ -43,6 +43,17 @@
       const helpClose = document.getElementById("ed-help-close");
       if (helpClose) helpClose.onclick = () => helpModal.classList.remove("open");
 
+      // floating 3D-object controls (shown only while a 3D model is selected)
+      const bar3d = document.getElementById("ed-3dbar");
+      if (bar3d) {
+        bar3d.querySelectorAll("[data-mode]").forEach((b) =>
+          (b.onclick = () => this.set3DMode(b.dataset.mode)));
+        bar3d.querySelectorAll("[data-zoom]").forEach((b) =>
+          (b.onclick = () => { const m = this.selected && this.selected.model3d; if (m) m.zoomBy(b.dataset.zoom === "in" ? 0.85 : 1.18); }));
+        const r3 = document.getElementById("ed-3d-reset");
+        if (r3) r3.onclick = () => { const m = this.selected && this.selected.model3d; if (m) m.resetView(); };
+      }
+
       S.app.ticker.add(() => { if (this.isOpen) this.drawGizmos(); });
       if (window.STUDIO) this.bindBoxEditing();
 
@@ -326,6 +337,35 @@
       if (this.__bgListItem) this.__bgListItem.classList.remove("sel");
       if (S.inspector) S.inspector.show(ev);
       if (this.rigEditor) this.rigEditor.onSelect(ev);
+      this.update3DBar(ev);
+    }
+
+    /* mode buttons on the floating 3D bar: Move (box editing) vs Orbit/Pan (camera) */
+    set3DMode(mode) {
+      const ev = this.selected;
+      if (!ev || ev.spec.type !== "model3d") return;
+      const m3 = ev.spec.model3d || (ev.spec.model3d = {});
+      if (mode === "move") {
+        m3.orbit = false;
+        if (ev.model3d) ev.model3d.setControls(false);
+      } else {
+        m3.orbit = true;
+        if (ev.model3d) { ev.model3d.setControls(true); ev.model3d.setDragMode(mode); }
+      }
+      this.update3DBar(ev);
+      if (S.persist) S.persist.markDirty(ev.spec.id);
+    }
+
+    /* show the 3D bar only for a selected 3D model; highlight the active mode */
+    update3DBar(ev) {
+      const bar = document.getElementById("ed-3dbar");
+      if (!bar) return;
+      const is3d = !!(ev && ev.spec && ev.spec.type === "model3d");
+      bar.classList.toggle("show", is3d);
+      if (!is3d) return;
+      const m3 = ev.spec.model3d || {};
+      const mode = !m3.orbit ? "move" : ((ev.model3d && ev.model3d._dragMode) || "orbit");
+      bar.querySelectorAll("[data-mode]").forEach((b) => b.classList.toggle("on", b.dataset.mode === mode));
     }
 
     selectBackground() {
@@ -338,6 +378,7 @@
       if (this.__bgListItem) this.__bgListItem.classList.add("sel");
       if (this.rigEditor) this.rigEditor.close();
       if (S.inspector) S.inspector.showBackground(v);
+      this.update3DBar(null);
     }
 
     drawGizmos() {

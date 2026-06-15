@@ -307,6 +307,7 @@
       { label: "Draw polygon element", kbd: "click+Enter", tool: "poly", run: () => tools.setTool("poly") },
       "-",
       { label: "OCR selected element", run: () => editor.selected && S.studio.ocrElement(editor.selected.spec).then(() => S.inspector.show(editor.selected)) },
+      { label: "Reset selected element", run: () => editor.selected && S.persist && S.persist.resetElement(editor.selected.spec.id) },
       { label: "Delete selected element", kbd: "Ctrl+Del", run: () => editor.selected && editor.deleteElement(editor.selected) },
     ]));
     // 3D primitives: pick a colour, click a shape to drop it on the current slide

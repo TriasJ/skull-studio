@@ -62,6 +62,7 @@
       this.disposed = false;
       this.running = false;
       this.spin = 0;                    // entrance one-shot yaw offset (radians)
+      this._dragMode = "orbit";         // toolbar sets "orbit" | "pan"
       // render target sized to the element box (DPR-aware, capped, aspect-kept)
       const w = Math.max(8, ev.box.w) * DPR, h = Math.max(8, ev.box.h) * DPR;
       const s = Math.min(1, MAX_PX / Math.max(w, h));
@@ -158,6 +159,14 @@
       this._frame(0);                   // render immediately (also works when idle)
     }
 
+    setDragMode(m) { this._dragMode = m === "pan" ? "pan" : "orbit"; }
+
+    zoomBy(factor) {                    // toolbar +/- buttons (wheel still works)
+      if (!this._home) return;
+      this._r = S.clamp(this._r * factor, this._home.r * 0.25, this._home.r * 5);
+      this._applyCamera();
+    }
+
     resetView() {                       // inspector "Reset view" -> framed home
       const h = this._home;
       if (!h) return;
@@ -179,7 +188,7 @@
         let drag = false, pan = false, lx = 0, ly = 0;
         const down = (e) => {
           drag = true;
-          pan = !!(e.shiftKey || e.button === 1 || e.button === 2);
+          pan = this._dragMode === "pan" || !!(e.shiftKey || e.button === 1 || e.button === 2);
           lx = e.global.x; ly = e.global.y; view.cursor = "grabbing";
           if (e.stopPropagation) e.stopPropagation();
         };

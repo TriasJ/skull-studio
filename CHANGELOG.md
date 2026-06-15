@@ -13,6 +13,17 @@ loose [semantic versioning](https://semver.org/) while pre-1.0.
   to orbit, scroll to zoom, shift-drag to pan, plus **Reset view**. Works in the
   editor and in the exported HTML viewer (the flag persists). Off by default so it
   doesn't interfere with slide navigation or box editing.
+- **Floating 3D bar:** selecting a 3D model shows a contextual bar — **Move / Orbit /
+  Pan**, **− / +** zoom, **Reset** — so orbit/pan are one click (no modifier keys).
+  Appears only for 3D models, so it doesn't clutter.
+
+### Editor UI
+- Decluttered the top controller: in Studio the redundant buttons (Box/Poly/Preview/
+  Export/Reset/Help) now live only in the menu bar, leaving a compact slide-nav
+  controller — fixes the menu-bar / controller **overlap**. (Single-file editor keeps
+  them, since it has no menu bar.) Added **Reset selected element** to the Tools menu.
+- In-app **help** updated with a 3D-models section (add primitives, Move/Orbit/Pan/
+  Zoom, export bake behaviour) and a note that Studio actions live in the menu bar.
 - **Export rule:** real imported 3D models (carry PowerPoint's own XML) round-trip as
   live, animated 3D; synthetic models (editor primitives, generated samples) **bake to
   a picture** on PPTX export — because PowerPoint only displays 3D it imported itself,

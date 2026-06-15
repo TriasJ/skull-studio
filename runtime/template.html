@@ -34,6 +34,13 @@
   #ed-top { top: 10px; left: 50%; transform: translateX(-50%); padding: 6px 10px; display: flex; gap: 6px; align-items: center; flex-wrap: wrap; max-width: 60vw; }
   .studio-only { display: none !important; }
   #skull-editor.studio .studio-only { display: inline-block !important; }
+  /* in Studio these live in the menu bar, so keep them out of the top controller
+     (declutters and avoids overlapping the centred slideshow controls) */
+  #skull-editor.studio .hide-in-studio { display: none !important; }
+  /* floating 3D-object controls: only visible while a 3D model is selected */
+  #ed-3dbar { left: 50%; transform: translateX(-50%); bottom: 14px; padding: 5px 7px; gap: 4px; align-items: center; display: none; }
+  #ed-3dbar.show { display: flex; }
+  #ed-3dbar .ed-badge { padding: 0 4px; }
   #skull-editor.studio #ed-menubar { display: flex; }
   /* menu bar (studio) */
   #skull-editor #ed-menubar { position: absolute; top: 10px; left: 10px; display: none; gap: 2px; padding: 2px 6px; overflow: visible; z-index: 35; }
@@ -189,13 +196,13 @@
     <span id="ed-slide-label" class="ed-badge">s01</span>
     <button id="ed-next" title="next slide">&#9654;</button>
     <button id="ed-replay" title="replay this slide's entrance animations">Replay</button>
-    <span style="width:14px"></span>
-    <button id="ed-tool-box" class="studio-only tool" data-tool="box" title="Draw a new element: drag a rectangle on the slide. Esc cancels.">&#9645; Box</button>
-    <button id="ed-tool-poly" class="studio-only tool" data-tool="poly" title="Draw a polygon element: click vertices, Enter or double-click to close. Becomes an alpha-masked cutout. Esc cancels.">&#11041; Poly</button>
-    <button id="ed-preview" class="studio-only primary" title="build the final single-file presentation and open it in a new tab - what your audience will see">&#9658; Preview</button>
-    <button id="ed-export" class="primary" title="download your edits as overrides.json (bake with: node scripts/build.mjs --apply overrides.json)">Export overrides.json</button>
-    <button id="ed-reset" title="discard saved edits for the selected element and reload">Reset element</button>
-    <button id="ed-help-btn" title="help &amp; shortcuts">?</button>
+    <span class="hide-in-studio" style="width:14px"></span>
+    <button id="ed-tool-box" class="studio-only hide-in-studio tool" data-tool="box" title="Draw a new element: drag a rectangle on the slide. Esc cancels.">&#9645; Box</button>
+    <button id="ed-tool-poly" class="studio-only hide-in-studio tool" data-tool="poly" title="Draw a polygon element: click vertices, Enter or double-click to close. Becomes an alpha-masked cutout. Esc cancels.">&#11041; Poly</button>
+    <button id="ed-preview" class="studio-only hide-in-studio primary" title="build the final single-file presentation and open it in a new tab - what your audience will see">&#9658; Preview</button>
+    <button id="ed-export" class="primary hide-in-studio" title="download your edits as overrides.json (bake with: node scripts/build.mjs --apply overrides.json)">Export overrides.json</button>
+    <button id="ed-reset" class="hide-in-studio" title="discard saved edits for the selected element and reload">Reset element</button>
+    <button id="ed-help-btn" class="hide-in-studio" title="help &amp; shortcuts">?</button>
     <span id="ed-save-status" class="ed-badge"></span>
   </div>
   <div id="ed-help"><div class="box">
@@ -218,6 +225,13 @@
       <tr><td><b>② Animate</b></td><td>move the playhead on the timeline, then drag a pin to record a keyframe there. The first keyframe auto-adds rest keys at 0s and the end so the motion loops home. <b>▶ Play</b> previews.</td></tr>
       <tr><td>timeline</td><td>drag the ruler to scrub; drag a diamond sideways to re-time it; right-click a diamond (or select it and <b>Delete key</b>) to remove it.</td></tr>
     </table>
+    <h4>3D models</h4>
+    <table>
+      <tr><td><b>Add a shape</b></td><td>Studio <b>3D</b> menu: pick a colour, then click <i>plane / cube / sphere / cylinder / cone / torus</i>. It drops on the current slide and renders live.</td></tr>
+      <tr><td><b>Imported</b></td><td>PowerPoint <i>Insert &rarr; 3D Models</i> come in automatically; baked glTF animations play. Tune clip / loop / auto-rotate / camera FOV in the inspector.</td></tr>
+      <tr><td><b>Move / Orbit / Pan / Zoom</b></td><td>select a 3D model to get the floating <b>3D bar</b> (bottom): <b>Move</b> edits its box; <b>Orbit</b> / <b>Pan</b> drag the camera; <b>&minus; / +</b> (or scroll on the model) zoom; <b>Reset</b> recentres. The interactive setting carries into the exported HTML viewer.</td></tr>
+      <tr><td><b>Export</b></td><td>imported models round-trip to PowerPoint as live 3D; added primitives <b>bake to a picture</b> in PPTX (PowerPoint only shows 3D it imported itself) but stay interactive in the HTML export.</td></tr>
+    </table>
     <h4>Saving vs exporting - what's what</h4>
     <table>
       <tr><td><b>Save</b> <kbd>Ctrl+S</kbd></td><td>writes your edits into the project file (<code>work/manifest.json</code>). Studio autosaves ~1s after every change; this is your working document, not a deliverable. (The single-file editor saves to browser localStorage instead.)</td></tr>
@@ -227,7 +241,7 @@
       <tr><td><b>Export overrides.json</b></td><td>downloads only your <i>edits</i> (per-element diffs). Made for the single-file editor workflow: edit <code>editor.html</code> anywhere, export, then bake with <code>node scripts/build.mjs --apply overrides.json</code>. In Studio you rarely need it - Save already persists everything.</td></tr>
     </table>
     <h4>Studio extras</h4>
-    <div>Drag a selected element to move its detection box, gold corner to resize, then <b>Re-crop &amp; reload</b>. <b>&#9645; Box</b>/<b>&#11041; Poly</b> draw new elements (editable immediately; pixels appear after re-crop). Polygon: click vertices; <b>click the first (ringed) node</b>, <kbd>Enter</kbd> or double-click to close; <kbd>Backspace</kbd> or right-click undoes the last point. <b>Mask areas</b> (+/&minus; Box/Poly) boolean-edit the selected element's shape. <b>OCR text</b> reads the element's text from the slide image.</div>
+    <div>All Studio actions live in the <b>top-left menu bar</b> (File / Preprocess / Tools / 3D / Options / Help); the top controller keeps just the slide nav. Drag a selected element to move its detection box, gold corner to resize, then <b>Re-crop &amp; reload</b>. <b>&#9645; Box</b>/<b>&#11041; Poly</b> draw new elements (editable immediately; pixels appear after re-crop). Polygon: click vertices; <b>click the first (ringed) node</b>, <kbd>Enter</kbd> or double-click to close; <kbd>Backspace</kbd> or right-click undoes the last point. <b>Mask areas</b> (+/&minus; Box/Poly) boolean-edit the selected element's shape. <b>OCR text</b> reads the element's text from the slide image.</div>
     <div style="text-align:right;margin-top:12px"><button id="ed-help-close" class="primary">Close</button></div>
   </div></div>
   <div class="panel" id="ed-left">
@@ -260,6 +274,19 @@
     </div>
     <div id="ed-rig-hint" class="ed-rig-hint"></div>
     <canvas id="ed-timeline-canvas" title="drag the ruler to scrub; drag a diamond to re-time it; right-click a diamond to delete"></canvas>
+  </div>
+  <div class="panel" id="ed-3dbar">
+    <span class="ed-badge">3D</span>
+    <span class="ed-seg">
+      <button class="seg-btn" data-mode="move" title="move / resize the element's box on the slide">Move</button>
+      <button class="seg-btn" data-mode="orbit" title="drag the model to orbit the camera">Orbit</button>
+      <button class="seg-btn" data-mode="pan" title="drag the model to pan">Pan</button>
+    </span>
+    <span class="ed-seg">
+      <button class="seg-btn" data-zoom="out" title="zoom out (or scroll on the model)">&minus;</button>
+      <button class="seg-btn" data-zoom="in" title="zoom in (or scroll on the model)">+</button>
+    </span>
+    <button id="ed-3d-reset" title="reset the camera to the framed view">Reset</button>
   </div>
 </div>
 <!-- EDITOR:DOM:END -->
