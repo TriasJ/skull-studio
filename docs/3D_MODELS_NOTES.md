@@ -119,16 +119,23 @@ them back to PPTX — a true round-trip, animations included.
    `meterPerModelUnit=0.5` → ~0.5 m model at 1.87 m → ~70% of frame. (Three.js is
    unaffected — its runtime camera auto-frames from the bounding box.)
 
-### Still open / hardest part
-**3D scene-animation playback for *synthetic* models in PowerPoint is unconfirmed.**
-The XML matches PowerPoint's own structure (child-node clip, embedAnim, emph timing),
-but it can't be verified without PowerPoint, and PowerPoint may only replay embedded
-clips it imported/processed itself. The reliable path is **verbatim**: exporting a deck
-that was *imported from PowerPoint* reuses PowerPoint's own camera + animation XML
-(only shape-ids remapped), so framing and animation are PowerPoint-authored. Test
-order: real-deck round-trip first (verbatim), then the generated sample. Also recall
-3D scene animations typically only run in **Slideshow**, often on click (the timing
-sits in the interactive main sequence).
+### Status: verbatim round-trip CONFIRMED in PowerPoint
+Exporting a deck that was **imported from PowerPoint** round-trips fully: the 3D
+models render correctly framed **and their scene animations play in PowerPoint
+slideshow** (confirmed on the real test deck). This is the actual use case
+(import → edit → export). The verbatim path reuses PowerPoint's own camera +
+animation XML, only remapping shape-ids, which is why it "just works".
+
+**Synthetic-model animation is the one fixture limitation.** Our generated
+sphere/cone/torus now frame correctly in PowerPoint (camera fix above), but their
+*animation* — driven by our hand-baked glTF clip + synthesized `embedAnim`/`emph`
+timing — is not confirmed to play in PowerPoint, even though the XML mirrors
+PowerPoint's structure and the clip plays perfectly in the HTML/three.js viewer.
+The likely reason: PowerPoint only replays embedded scene animations it
+imported/processed through its own 3D pipeline, not arbitrary third-party glTF
+clips. This affects only the generated sample, not real imported decks. (Also note
+3D scene animations generally run only in **Slideshow**, often on click, since the
+timing lives in the interactive main sequence.)
 
 ## Things to keep in mind / verify with real PowerPoint
 
