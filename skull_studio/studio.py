@@ -103,6 +103,13 @@ TASKS = {
     "render-clips": lambda opts=None: [[PY, SCRIPTS / "render_clips.py", "--format",
                                         (opts or {}).get("format", "mp4"), "--fps",
                                         str(int((opts or {}).get("fps") or 18))]],
+    # export a single selected element (QoL)
+    "export-element": lambda opts=None: [[PY, SCRIPTS / "export_element.py",
+                                          (opts or {}).get("id", ""), (opts or {}).get("format", "png")]],
+    "render-element-clip": lambda opts=None: [[PY, SCRIPTS / "render_clips.py",
+                                               "--format", (opts or {}).get("format", "mp4"),
+                                               "--fps", str(int((opts or {}).get("fps") or 18)),
+                                               "--element-id", (opts or {}).get("id", "")]],
     "crops": lambda _=None: [[PY, SCRIPTS / "crop_and_patch.py"],
                              [PY, SCRIPTS / "debug_overlay.py"]],
     "choreo": lambda _=None: [[PY, SCRIPTS / "auto_choreo.py"]],

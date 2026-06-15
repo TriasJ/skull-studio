@@ -36,10 +36,26 @@
     a.click();
     setTimeout(() => URL.revokeObjectURL(a.href), 5000);
   }
+  function downloadFile(url, name) {           // download a server file (binary)
+    const a = document.createElement("a");
+    a.href = url; a.download = name;
+    document.body.appendChild(a); a.click(); a.remove();
+  }
 
   S.studio = {
     runTask,
     recrop: () => runTask("crops", null, { reload: true }),
+    // export the selected element: png/jpg (static crop) or gif/mp4 (baked animation)
+    async exportElement(ev, fmt) {
+      const id = ev.spec.id;
+      const animated = fmt === "gif" || fmt === "mp4";
+      const ok = await runTask(animated ? "render-element-clip" : "export-element",
+                               { id, format: fmt });
+      if (!ok) { setStatus("export failed (see log)"); return; }
+      const base = animated ? `/work/clips/${id}.${fmt}` : `/work/export/${id}.${fmt}`;
+      downloadFile(base + "?v=" + Date.now(), `${id}.${fmt}`);
+      setStatus("exported " + fmt.toUpperCase());
+    },
     needsRecrop(what) {
       setStatus(`${what} changed - Re-crop & reload to apply`);
     },

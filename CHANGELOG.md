@@ -5,6 +5,12 @@ loose [semantic versioning](https://semver.org/) while pre-1.0.
 
 ## [Unreleased]
 
+### Export a single element
+- Inspector **export** row (Studio): save the selected element as **PNG** or **JPG**
+  (static, from its crop), or — when it has idle/rig motion — **GIF** or **MP4** (its
+  animation baked via the existing clip renderer). New `export_element.py` +
+  `render_clips.py --element-id`; downloaded straight from the editor.
+
 ### Lightweight OCR (no big download)
 - New **RapidOCR** import path — recovers text from rendered slides using the
   already-bundled `rapidocr-onnxruntime` engine, so you can skip MinerU's ~GB model

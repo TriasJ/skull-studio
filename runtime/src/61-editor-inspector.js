@@ -233,6 +233,13 @@
       if (window.STUDIO) {
         h.push(`<div class="row" style="margin-top:8px"><button id="ed-recrop" class="primary">Re-crop &amp; reload</button>
                 <button id="ed-ocr">OCR text</button><button id="ed-del">Delete</button></div>`);
+        const motion = (spec.idle && spec.idle.length) ||
+          (spec.rig && spec.rig.anim && Object.keys(spec.rig.anim.tracks || {}).length);
+        h.push(`<div class="row" style="margin-top:6px"><label style="flex:0 0 auto">export</label>
+          <button id="ed-exp-png" title="save this element as a transparent PNG">PNG</button>
+          <button id="ed-exp-jpg" title="save as JPG (flattened on the deck background)">JPG</button>` +
+          (motion ? `<button id="ed-exp-gif" title="bake this element's animation to a looping GIF">GIF</button>
+                     <button id="ed-exp-mp4" title="bake to a looping mp4">MP4</button>` : ``) + `</div>`);
         h.push(`<div id="ed-hint">Patch, mask and box changes apply on Re-crop. Drag the element to move its box; gold corner resizes.</div>`);
       }
 
@@ -402,6 +409,14 @@
       };
       const delBtn = document.getElementById("ed-del");
       if (delBtn) delBtn.onclick = () => this.editor.deleteElement(ev);
+
+      for (const f of ["png", "jpg", "gif", "mp4"]) {
+        const b = document.getElementById("ed-exp-" + f);
+        if (b) b.onclick = async () => {
+          b.disabled = true;
+          try { await S.studio.exportElement(ev, f); } finally { b.disabled = false; }
+        };
+      }
 
       const recrop = document.getElementById("ed-recrop");
       if (recrop) recrop.onclick = async () => {

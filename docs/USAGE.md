@@ -61,6 +61,10 @@ name; rename in the inspector.
 **Tools menu / toolbar** — **▭ Box** and **⬡ Poly** draw new elements (polygons
 become alpha-masked cutouts). **OCR** reads an element's text from the slide image.
 
+**Export selected** (Studio, inspector) — save the selected element as **PNG** /
+**JPG** (static), or **GIF** / **MP4** (its animation, shown only when the element
+has an idle or rig). The file downloads straight from the editor.
+
 **Mesh & 2D-bone rigging**
 - Enable mesh deform, or pick a **Quick motion** preset (Breathe, Sway, Float,
   Pendulum, Wave).

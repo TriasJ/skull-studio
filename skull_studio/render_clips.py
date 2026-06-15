@@ -304,6 +304,8 @@ def main(args):
         bg = np.array(Image.open(bg_path).convert("RGB"))
         BH, BW = bg.shape[:2]
         for el in slide["elements"]:
+            if args.element_id and el["id"] != args.element_id:
+                continue
             has_idle = any(i["type"] in ("breath", "float", "sway", "pulse", "shimmer")
                            for i in el.get("idle", []))
             has_rig = bool(el.get("rig") and el["rig"].get("anim", {}).get("tracks"))
@@ -367,4 +369,5 @@ if __name__ == "__main__":
     ap.add_argument("--max-dur", type=float, default=6.0)
     ap.add_argument("--max-dim", type=int, default=800,
                     help="downscale clips to this max width/height (smaller files)")
+    ap.add_argument("--element-id", default=None, help="bake only this element (others skipped)")
     main(ap.parse_args())
