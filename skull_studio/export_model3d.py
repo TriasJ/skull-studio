@@ -90,6 +90,16 @@ def _model3d_xml(model, glb_rid, img_rid, cx, cy):
     ax, ay, az = (int(round(r / math.pi * 180 * DEG)) for r in rot)
     vp = max(int(cx), int(cy))
     a = NS["a"]
+    # when the GLB has a baked clip, reference it so PowerPoint can play it
+    emb = ""
+    if m3.get("clip") is not None:
+        dur = int(m3.get("durationMs") or 5000)
+        emb = (f'<am3d:extLst>'
+               f'<a:ext uri="{{9A65AA19-BECB-4387-8358-8AD5134E1D82}}">'
+               f'<a3danim:embedAnim xmlns:a3danim="{NS["a3d"]}" animId="0">'
+               f'<a3danim:animPr length="{dur}" count="indefinite"/></a3danim:embedAnim></a:ext>'
+               f'<a:ext uri="{{E9DE012E-A134-456F-84FE-255F9AAD75C6}}">'
+               f'<a3danim:posterFrame xmlns:a3danim="{NS["a3d"]}" animId="0"/></a:ext></am3d:extLst>')
     xml = f'''<am3d:model3d xmlns:am3d="{NS['am3d']}" xmlns:a="{a}" xmlns:r="{NS['r']}" r:embed="{glb_rid}">
   <am3d:spPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="{int(cx)}" cy="{int(cy)}"/></a:xfrm>
     <a:prstGeom prst="rect"><a:avLst/></a:prstGeom></am3d:spPr>
@@ -100,7 +110,7 @@ def _model3d_xml(model, glb_rid, img_rid, cx, cy):
     <am3d:scale><am3d:sx n="1000000" d="1000000"/><am3d:sy n="1000000" d="1000000"/><am3d:sz n="1000000" d="1000000"/></am3d:scale>
     <am3d:rot ax="{ax}" ay="{ay}" az="{az}"/>
     <am3d:postTrans dx="0" dy="0" dz="0"/></am3d:trans>
-  <am3d:raster rName="Office3DRenderer" rVer="16.0.8326"><am3d:blip r:embed="{img_rid}"/></am3d:raster>
+  <am3d:raster rName="Office3DRenderer" rVer="16.0.8326"><am3d:blip r:embed="{img_rid}"/></am3d:raster>{emb}
   <am3d:objViewport viewportSz="{vp}"/>
   <am3d:ambientLight><am3d:clr><a:scrgbClr r="55000" g="55000" b="55000"/></am3d:clr>
     <am3d:illuminance n="550000" d="1000000"/></am3d:ambientLight>
@@ -169,6 +179,42 @@ def _ensure_content_types(xml_bytes):
     return etree.tostring(root, xml_declaration=True, encoding="UTF-8", standalone=True)
 
 
+def _generate_timing(targets):
+    """Build a <p:timing> that plays each model's embedded clip (looping), for
+    decks whose models carry a baked clip but no captured PowerPoint timing.
+    targets: [(spid, durationMs), ...]. Mirrors PowerPoint's own 3D emph nodes."""
+    p = NS["p"]
+    cid = 4                                    # ids 1=tmRoot, 2=mainSeq, 3/4=containers
+    emphs = ""
+    for spid, dur in targets:
+        cid += 1; e = cid
+        cid += 1; c = cid
+        emphs += (
+            f'<p:par><p:cTn id="{e}" presetID="100" presetClass="emph" presetSubtype="1" '
+            f'repeatCount="indefinite" fill="hold" nodeType="withEffect">'
+            f'<p:stCondLst><p:cond delay="0"/></p:stCondLst><p:childTnLst>'
+            f'<p:anim calcmode="lin" valueType="num"><p:cBhvr>'
+            f'<p:cTn id="{c}" dur="{int(dur)}" fill="hold"/>'
+            f'<p:tgtEl><p:spTgt spid="{spid}"/></p:tgtEl>'
+            f'<p:attrNameLst><p:attrName>embedded1</p:attrName></p:attrNameLst></p:cBhvr>'
+            f'<p:tavLst><p:tav tm="0"><p:val><p:fltVal val="0"/></p:val></p:tav>'
+            f'<p:tav tm="100000"><p:val><p:fltVal val="1"/></p:val></p:tav></p:tavLst>'
+            f'</p:anim></p:childTnLst></p:cTn></p:par>')
+    return (
+        f'<p:timing xmlns:p="{p}"><p:tnLst><p:par>'
+        f'<p:cTn id="1" dur="indefinite" restart="never" nodeType="tmRoot"><p:childTnLst>'
+        f'<p:seq concurrent="1" nextAc="seek"><p:cTn id="2" dur="indefinite" nodeType="mainSeq"><p:childTnLst>'
+        f'<p:par><p:cTn id="3" fill="hold"><p:stCondLst><p:cond delay="indefinite"/>'
+        f'<p:cond evt="onBegin" delay="0"><p:tn val="2"/></p:cond></p:stCondLst><p:childTnLst>'
+        f'<p:par><p:cTn id="4" fill="hold"><p:stCondLst><p:cond delay="0"/></p:stCondLst><p:childTnLst>'
+        f'{emphs}'
+        # close: ctl4,cTn4,parC | ctl3,cTn3,parB | ctl2(mainSeq),cTn2
+        f'</p:childTnLst></p:cTn></p:par></p:childTnLst></p:cTn></p:par></p:childTnLst></p:cTn>'
+        f'<p:prevCondLst><p:cond evt="onPrev" delay="0"><p:tgtEl><p:sldTgt/></p:tgtEl></p:cond></p:prevCondLst>'
+        f'<p:nextCondLst><p:cond evt="onNext" delay="0"><p:tgtEl><p:sldTgt/></p:tgtEl></p:cond></p:nextCondLst>'
+        f'</p:seq></p:childTnLst></p:cTn></p:par></p:tnLst></p:timing>')
+
+
 def _replay_timing(slide_root, timing_xml, spidmap):
     """Re-attach the original 3D-scene-animation <p:timing>, with shape ids
     remapped onto the re-exported shapes. Reusing PowerPoint's own timing verbatim
@@ -211,6 +257,7 @@ def inject(pptx_path, models_by_slide, W_emu, H_emu, timing_by_slide=None):
                      etree.fromstring(f'<Relationships xmlns="{NS["rel"]}"/>'.encode()))
         shape_id = _next_shape_id(sptree)
         spidmap = {}                                  # original spid -> new spid
+        anim_targets = []                             # (new spid, durMs) for clip-bearing models
 
         for model in models:
             glb_name = f"ppt/media/model3d{glb_k}.glb"; glb_k += 1
@@ -224,9 +271,12 @@ def inject(pptx_path, models_by_slide, W_emu, H_emu, timing_by_slide=None):
             img_rid = f"rId{_next_rid(rels_root)}"
             _add_rel(rels_root, img_rid, IMAGE_REL, f"../media/{Path(img_name).name}")
 
-            old_spid = (model.get("model3d") or {}).get("sourceSpid")
+            m3 = model.get("model3d") or {}
+            old_spid = m3.get("sourceSpid")
             if old_spid:
                 spidmap[str(old_spid)] = str(shape_id)
+            if m3.get("clip") is not None:
+                anim_targets.append((shape_id, int(m3.get("durationMs") or 5000)))
             alt = _alt_content(model, glb_rid, img_rid, shape_id, W_emu, H_emu)
             shape_id += 1
             ext = sptree.find(_q("p", "extLst"))      # keep extLst last if present
@@ -235,7 +285,13 @@ def inject(pptx_path, models_by_slide, W_emu, H_emu, timing_by_slide=None):
             else:
                 sptree.append(alt)
 
-        _replay_timing(slide_root, timing_by_slide.get(sidx), spidmap)
+        captured = timing_by_slide.get(sidx)
+        if captured:                                  # real deck: replay PowerPoint's own timing
+            _replay_timing(slide_root, captured, spidmap)
+        elif anim_targets:                            # generated clips: synthesize the trigger
+            for ex in slide_root.findall(_q("p", "timing")):
+                slide_root.remove(ex)
+            slide_root.append(etree.fromstring(_generate_timing(anim_targets).encode("utf-8")))
 
         members[spart] = etree.tostring(slide_root, xml_declaration=True,
                                         encoding="UTF-8", standalone=True)

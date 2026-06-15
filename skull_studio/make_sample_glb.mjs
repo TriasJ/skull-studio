@@ -74,7 +74,36 @@ function torus(R = 1, r = 0.4, tseg = 48, pseg = 24) {
 // ---- minimal GLB writer -------------------------------------------------------
 function pad4(n) { return (4 - (n % 4)) % 4; }
 
-function buildGLB({ pos, nor, idx }, color) {
+// three.js-compatible quaternion from XYZ-order Euler angles
+function quat(x, y, z) {
+  const cx = Math.cos(x / 2), sx = Math.sin(x / 2);
+  const cy = Math.cos(y / 2), sy = Math.sin(y / 2);
+  const cz = Math.cos(z / 2), sz = Math.sin(z / 2);
+  return [sx * cy * cz + cx * sy * sz, cx * sy * cz - sx * cy * sz,
+          cx * cy * sz - sx * sy * cz, cx * cy * cz + sx * sy * sz];
+}
+
+// Bake a looping 3-axis rotation as glTF rotation keyframes (node 0). Integer
+// turns per axis -> the clip ends where it started, so it loops seamlessly.
+function rotationClip({ dur = 5, turns = [1, 2, 1], samples = 48 }) {
+  const TAU = Math.PI * 2;
+  const times = new Float32Array(samples + 1);
+  const quats = new Float32Array((samples + 1) * 4);
+  let prev = null;
+  for (let i = 0; i <= samples; i++) {
+    const t = i / samples;
+    times[i] = +(t * dur).toFixed(6);
+    let q = quat(t * turns[0] * TAU, t * turns[1] * TAU, t * turns[2] * TAU);
+    if (prev && (prev[0] * q[0] + prev[1] * q[1] + prev[2] * q[2] + prev[3] * q[3]) < 0) {
+      q = q.map((v) => -v);                 // keep slerp on the short arc (no flips)
+    }
+    quats.set(q, i * 4);
+    prev = q;
+  }
+  return { times, quats, dur };
+}
+
+function buildGLB({ pos, nor, idx }, color, anim) {
   const positions = new Float32Array(pos);
   const normals = new Float32Array(nor);
   const indices = new Uint16Array(idx);
@@ -85,14 +114,17 @@ function buildGLB({ pos, nor, idx }, color) {
       max[k] = Math.max(max[k], positions[i + k]);
     }
 
-  // pack buffer: positions | normals | indices (each 4-byte aligned)
-  const pB = Buffer.from(positions.buffer);
-  const nB = Buffer.from(normals.buffer);
-  const iB = Buffer.from(indices.buffer);
+  // pack buffer: positions | normals | indices [ | anim times | anim quats ]
+  const clip = anim ? rotationClip(anim) : null;
+  const blocks = [[Buffer.from(positions.buffer), 34962], [Buffer.from(normals.buffer), 34962],
+                  [Buffer.from(indices.buffer), 34963]];
+  if (clip) {
+    blocks.push([Buffer.from(clip.times.buffer), 0], [Buffer.from(clip.quats.buffer), 0]);
+  }
   const parts = [], views = [];
   let off = 0;
-  for (const [buf, target] of [[pB, 34962], [nB, 34962], [iB, 34963]]) {
-    views.push({ buffer: 0, byteOffset: off, byteLength: buf.length, target });
+  for (const [buf, target] of blocks) {
+    views.push({ buffer: 0, byteOffset: off, byteLength: buf.length, ...(target ? { target } : {}) });
     parts.push(buf);
     const p = pad4(buf.length);
     if (p) { parts.push(Buffer.alloc(p)); off += p; }
@@ -118,6 +150,17 @@ function buildGLB({ pos, nor, idx }, color) {
     bufferViews: views,
     buffers: [{ byteLength: bin.length }],
   };
+  if (clip) {
+    gltf.accessors.push(
+      { bufferView: 3, componentType: 5126, count: clip.times.length, type: "SCALAR",
+        min: [0], max: [clip.dur] },                                   // sampler input needs min/max
+      { bufferView: 4, componentType: 5126, count: clip.times.length, type: "VEC4" });
+    gltf.animations = [{
+      name: "tumble",
+      samplers: [{ input: 3, output: 4, interpolation: "LINEAR" }],
+      channels: [{ sampler: 0, target: { node: 0, path: "rotation" } }],
+    }];
+  }
 
   let json = Buffer.from(JSON.stringify(gltf), "utf8");
   if (pad4(json.length)) json = Buffer.concat([json, Buffer.alloc(pad4(json.length), 0x20)]); // space-pad
@@ -134,13 +177,14 @@ function buildGLB({ pos, nor, idx }, color) {
 const outDir = process.argv[2] ||
   join(dirname(fileURLToPath(import.meta.url)), "..", "sample", "models");
 mkdirSync(outDir, { recursive: true });
+// each shape tumbles on all three axes (different per-axis turn counts), looping
 const shapes = [
-  ["sphere.glb", sphere(1), [0.30, 0.62, 0.90]],
-  ["cone.glb", cone(1, 2), [0.93, 0.64, 0.20]],
-  ["torus.glb", torus(1, 0.4), [0.79, 0.64, 0.15]],
+  ["sphere.glb", sphere(1), [0.30, 0.62, 0.90], { dur: 5, turns: [1, 2, 1] }],
+  ["cone.glb", cone(1, 2), [0.93, 0.64, 0.20], { dur: 6, turns: [2, 1, 1] }],
+  ["torus.glb", torus(1, 0.4), [0.79, 0.64, 0.15], { dur: 7, turns: [1, 1, 2] }],
 ];
-for (const [name, geo, color] of shapes) {
-  const glb = buildGLB(geo, color);
+for (const [name, geo, color, anim] of shapes) {
+  const glb = buildGLB(geo, color, anim);
   writeFileSync(join(outDir, name), glb);
-  console.log(`${name}  ${(glb.length / 1024).toFixed(1)} KB  (${geo.pos.length / 3} verts)`);
+  console.log(`${name}  ${(glb.length / 1024).toFixed(1)} KB  (${geo.pos.length / 3} verts, anim ${anim.dur}s)`);
 }

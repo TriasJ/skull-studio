@@ -73,7 +73,7 @@ def icon(kind, color, name):
     img.save(WORK / "crops" / f"{kind}.webp", "WEBP", quality=90)
 
 
-def model_el(kind, bbox, color, clip_name):
+def model_el(kind, bbox, clip_name, dur_ms):
     return {
         "id": kind, "type": "model3d", "role": "figure", "name": clip_name,
         "text": clip_name, "bbox": bbox, "crop": f"crops/{kind}.webp", "cropBbox": None,
@@ -82,7 +82,8 @@ def model_el(kind, bbox, color, clip_name):
         "idle": [], "parallax": 0.05, "lines": None, "rig": None,
         "blendMode": None, "opacity": 1, "hidden": False,
         "modelSrc": f"models/{kind}.glb",
-        "model3d": {"clip": None, "loop": False, "durationMs": None, "autoRotate": 32,
+        # play the GLB's baked 3-axis "tumble" clip (loops); also round-trips to PPTX
+        "model3d": {"clip": 0, "loop": True, "durationMs": dur_ms, "autoRotate": 0,
                     "camera": {"fov": 32}, "transform": {"rot": [0.35, 0.6, 0], "scale": [1, 1, 1]},
                     "previewSrc": None, "sourceXml": None},
     }
@@ -111,10 +112,10 @@ def main():
         "slides": [{
             "id": "s01", "index": 0,
             "background": {"src": "slides_webp/slide_01.webp", "idle": None},
-            "elements": [
-                model_el("sphere", [0.06, 0.30, 0.32, 0.82], None, "Sphere"),
-                model_el("cone", [0.375, 0.28, 0.625, 0.85], None, "Cone"),
-                model_el("torus", [0.68, 0.30, 0.94, 0.82], None, "Torus"),
+            "elements": [   # durations match the baked clips in make_sample_glb.mjs
+                model_el("sphere", [0.06, 0.30, 0.32, 0.82], "Sphere", 5000),
+                model_el("cone", [0.375, 0.28, 0.625, 0.85], "Cone", 6000),
+                model_el("torus", [0.68, 0.30, 0.94, 0.82], "Torus", 7000),
             ],
         }],
     }
