@@ -228,6 +228,7 @@
     wave(ev, spec) { return meshDisplace(ev, spec, waveDisp); },
     ripple(ev, spec) { return meshDisplace(ev, spec, rippleDisp); },   // underwater
     swirl(ev, spec) { return meshDisplace(ev, spec, swirlDisp); },
+    particles(ev, spec) { return S.Particles ? S.Particles.make(ev, spec) : { stop() {} }; },
 
     glow(ev, spec) {                       // pulsing additive bloom halo (core BlurFilter)
       const view = ev.view;

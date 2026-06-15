@@ -48,8 +48,9 @@ name; rename in the inspector.
 - **Entrance** — fade / fadeUp·Down·Left·Right / scaleIn / maskReveal / blurIn /
   drawOn / staggerText, with delay/duration/ease.
 - **Idle** — float / breath / pulse / sway / shimmer / **glow** (pulsing bloom) /
-  **wave** / **ripple** (underwater, 2–3 superimposed waves) / **swirl** / meshWave
-  (continuous loops). glow/wave/ripple/swirl also **bake into PPTX & video** exports.
+  **wave** / **ripple** (underwater, 2–3 superimposed waves) / **swirl** /
+  **particles** (sparkle/snow/embers/floatUp/bubbles) / meshWave (continuous loops).
+  glow/wave/ripple/swirl also **bake into PPTX & video**; particles are HTML-only.
 - **Parallax** — mouse-depth.
 - **Compositing** — blend mode (normal/add/screen/multiply/overlay/…) + opacity.
 - **Element** (studio) — type, z-order, and the detection box (drag to move, gold

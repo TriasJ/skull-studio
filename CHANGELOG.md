@@ -5,6 +5,12 @@ loose [semantic versioning](https://semver.org/) while pre-1.0.
 
 ## [Unreleased]
 
+### Particle system (HTML)
+- New `particles` idle effect with presets **sparkle / snow / embers / floatUp /
+  bubbles** (rate + size in the inspector). A lightweight ticker-driven emitter
+  (shared soft-dot texture) under the element, sizes/speeds relative to the box.
+  HTML-only — leaves the element static in PPTX/baked video (by design).
+
 ### 2D effect pack
 - New looping idle effects on raster elements: **glow** (pulsing additive bloom via a
   blurred halo, with colour), **wave** (single-axis sine), **ripple** (*underwater* —

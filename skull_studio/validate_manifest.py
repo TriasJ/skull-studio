@@ -15,7 +15,8 @@ ENTRANCES = {"fadeIn", "fadeUp", "fadeDown", "fadeLeft", "fadeRight", "scaleIn",
              "rotateIn", "scaleIn3D"}                       # 3D-model entrances
 IDLES = {"float", "pulse", "sway", "shimmer", "breath", "meshWave", "kenBurns",
          "none", "autoRotate",                              # autoRotate = 3D spin
-         "wave", "ripple", "swirl", "glow"}                 # 2D effect pack
+         "wave", "ripple", "swirl", "glow",                 # 2D effect pack
+         "particles"}                                       # HTML-only emitter
 TYPES = {"text", "image", "shape", "model3d"}
 CLEANUPS = {"none", "fill", "blur", "auto"}
 

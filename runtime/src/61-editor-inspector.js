@@ -6,7 +6,7 @@
 
   const ENTRANCES = ["none", "fadeIn", "fadeUp", "fadeDown", "fadeLeft", "fadeRight",
     "scaleIn", "maskReveal", "blurIn", "drawOn", "staggerText"];
-  const IDLES = ["float", "breath", "pulse", "sway", "shimmer", "glow", "wave", "ripple", "swirl", "meshWave"];
+  const IDLES = ["float", "breath", "pulse", "sway", "shimmer", "glow", "wave", "ripple", "swirl", "particles", "meshWave"];
   const MESH_IDLES = ["meshWave", "wave", "ripple", "swirl"];
   const EASES = ["power1.out", "power2.out", "power3.out", "power2.inOut", "sine.inOut",
     "back.out(1.4)", "expo.out", "elastic.out(1,0.4)", "none"];
@@ -144,7 +144,13 @@
         const on = idles.some((i) => i.type === name);
         idleRows.push(`<div class="row"><label>${name}</label>
           <input type="checkbox" data-idle="${name}" ${on ? "checked" : ""}></div>`);
-        if (on) {
+        if (on && name === "particles") {
+          const idle = idles.find((i) => i.type === name);
+          const presets = (S.Particles && S.Particles.presets) || ["sparkle"];
+          idleRows.push(row("&nbsp;&nbsp;preset", select("idle-preset-particles", presets, idle.preset || "sparkle")));
+          idleRows.push(row("&nbsp;&nbsp;rate", num("idle-rate-particles", idle.rate ?? 20, 2)));
+          idleRows.push(row("&nbsp;&nbsp;size", num("idle-size-particles", idle.size ?? 1, 0.1)));
+        } else if (on) {
           const idle = idles.find((i) => i.type === name);
           const amt = idle.amplitude ?? idle.amount ?? idle.degrees ?? 0.02;
           idleRows.push(row("&nbsp;&nbsp;amount", num(`idle-amt-${name}`, amt, 0.005)));
@@ -356,6 +362,19 @@
           if (idle) idle.color = e.target.value;
         });
       }
+      const pPreset = document.getElementById("idle-preset-particles");
+      if (pPreset) pPreset.onchange = (e) => {
+        const idle = spec.idle.find((i) => i.type === "particles");
+        if (idle) { idle.preset = e.target.value; this.commit(ev); }
+      };
+      onchange("idle-rate-particles", (e) => {
+        const idle = spec.idle.find((i) => i.type === "particles");
+        if (idle) idle.rate = parseFloat(e.target.value);
+      });
+      onchange("idle-size-particles", (e) => {
+        const idle = spec.idle.find((i) => i.type === "particles");
+        if (idle) idle.size = parseFloat(e.target.value);
+      });
 
       onchange("ed-blend", (e) => {
         spec.blendMode = e.target.value;
