@@ -69,10 +69,13 @@ def _emu_box(bbox, W, H):
     return x, y, round(bbox[2] * W) - x, round(bbox[3] * H) - y
 
 
-def _model3d_xml(model, glb_rid, img_rid):
+def _model3d_xml(model, glb_rid, img_rid, cx, cy):
     """Return an <am3d:model3d> element with embeds repointed at the new parts.
 
-    Prefers the verbatim source fragment; regenerates a minimal one otherwise."""
+    Prefers the verbatim source fragment; regenerates a *complete* one otherwise
+    (PowerPoint rejects -- and on repair strips -- a model3d that is missing the
+    objViewport or lighting, or that has a zero spPr extent, so we mirror the full
+    structure PowerPoint itself writes)."""
     src = (model.get("model3d") or {}).get("sourceXml")
     if src:
         node = etree.fromstring(src.encode("utf-8"))
@@ -82,20 +85,27 @@ def _model3d_xml(model, glb_rid, img_rid):
         return node
     # regenerate from structured fields
     m3 = model.get("model3d") or {}
-    cam = m3.get("camera") or {}
-    fov = int(round((cam.get("fov") or 45) * DEG))
+    fov = int(round((m3.get("camera", {}).get("fov") or 45) * DEG))
     rot = (m3.get("transform") or {}).get("rot") or [0, 0, 0]
     ax, ay, az = (int(round(r / math.pi * 180 * DEG)) for r in rot)
+    vp = max(int(cx), int(cy))
     a = NS["a"]
     xml = f'''<am3d:model3d xmlns:am3d="{NS['am3d']}" xmlns:a="{a}" xmlns:r="{NS['r']}" r:embed="{glb_rid}">
-  <am3d:spPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="0" cy="0"/></a:xfrm>
+  <am3d:spPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="{int(cx)}" cy="{int(cy)}"/></a:xfrm>
     <a:prstGeom prst="rect"><a:avLst/></a:prstGeom></am3d:spPr>
   <am3d:camera><am3d:pos x="0" y="0" z="50000000"/><am3d:up dx="0" dy="36000000" dz="0"/>
     <am3d:lookAt x="0" y="0" z="0"/><am3d:perspective fov="{fov}"/></am3d:camera>
   <am3d:trans><am3d:meterPerModelUnit n="1" d="1"/>
+    <am3d:preTrans dx="0" dy="0" dz="0"/>
     <am3d:scale><am3d:sx n="1000000" d="1000000"/><am3d:sy n="1000000" d="1000000"/><am3d:sz n="1000000" d="1000000"/></am3d:scale>
-    <am3d:rot ax="{ax}" ay="{ay}" az="{az}"/></am3d:trans>
-  <am3d:raster rName="skull-studio" rVer="1"><am3d:blip r:embed="{img_rid}"/></am3d:raster>
+    <am3d:rot ax="{ax}" ay="{ay}" az="{az}"/>
+    <am3d:postTrans dx="0" dy="0" dz="0"/></am3d:trans>
+  <am3d:raster rName="Office3DRenderer" rVer="16.0.8326"><am3d:blip r:embed="{img_rid}"/></am3d:raster>
+  <am3d:objViewport viewportSz="{vp}"/>
+  <am3d:ambientLight><am3d:clr><a:scrgbClr r="50000" g="50000" b="50000"/></am3d:clr>
+    <am3d:illuminance n="1000000" d="1000000"/></am3d:ambientLight>
+  <am3d:ptLight rad="0"><am3d:clr><a:scrgbClr r="100000" g="100000" b="100000"/></am3d:clr>
+    <am3d:intensity n="9765625" d="1000000"/><am3d:pos x="21959998" y="70920001" z="16344003"/></am3d:ptLight>
 </am3d:model3d>'''
     return etree.fromstring(xml.encode("utf-8"))
 
@@ -125,7 +135,7 @@ def _alt_content(model, glb_rid, img_rid, shape_id, W, H):
     graphic = etree.SubElement(gf, _q("a", "graphic"))
     gdata = etree.SubElement(graphic, _q("a", "graphicData"))
     gdata.set("uri", NS["am3d"])
-    gdata.append(_model3d_xml(model, glb_rid, img_rid))
+    gdata.append(_model3d_xml(model, glb_rid, img_rid, cx, cy))
 
     fb = etree.SubElement(alt, _q("mc", "Fallback"))
     pic = etree.SubElement(fb, _q("p", "pic"))
