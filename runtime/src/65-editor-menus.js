@@ -458,6 +458,8 @@
       modal.classList.remove("open");
       runTask("build-custom", {
         embedEditor: document.getElementById("hx-embed").checked,
+        threejs: document.getElementById("hx-threejs").value,
+        embedModels: document.getElementById("hx-embedmodels").checked,
         out: document.getElementById("hx-out").value.trim(),
       });
     };

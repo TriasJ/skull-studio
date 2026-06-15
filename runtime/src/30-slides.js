@@ -43,11 +43,14 @@
       if (this.spec.rig && S.Rig) this.attachRig(this.spec.rig);
     }
 
-    /* Sprite by default; MeshPlane when a rig or meshWave idle needs vertices. */
+    /* Sprite by default; MeshPlane when a rig or meshWave idle needs vertices;
+       a plain Sprite (preview crop) for model3d, whose texture S.Model3D swaps
+       to a live three.js render once the GLB loads. */
     makeView(tex, needMesh) {
       const hasMeshIdle = (this.spec.idle || []).some((i) => i.type === "meshWave");
+      const is3d = this.spec.type === "model3d";
       if (this.view) { this.idleNode.removeChild(this.view); this.view.destroy(); }
-      if (needMesh || hasMeshIdle) {
+      if (!is3d && (needMesh || hasMeshIdle)) {
         const m = this.spec.rig?.mesh || {};
         this.view = new PIXI.MeshPlane({
           texture: tex,
@@ -73,6 +76,8 @@
       this.view.visible = !this.spec.hidden;
       this.idleNode.addChild(this.view);
       this.view.__skullEl = this; // editor hit-testing backref
+      // model3d: start loading the GLB; it swaps this.view.texture when ready
+      if (is3d && S.Model3D && !this.model3d) this.model3d = S.Model3D.attach(this);
     }
 
     /* studio: bbox was edited - reposition using the new box (crop texture is
@@ -100,6 +105,7 @@
 
     startIdles() {
       this.stopIdles();
+      if (this.model3d) this.model3d.resume();   // render even under reduced-motion
       if (S.reducedMotion) return;
       for (const idle of this.spec.idle || []) {
         const fx = S.Effects.idle[idle.type];
@@ -111,11 +117,13 @@
     stopIdles() {
       for (const h of this.idleHandles) h.stop();
       this.idleHandles = [];
+      if (this.model3d) this.model3d.pause();    // off-slide: stop wasting the GPU
       if (this.rig && this.rig.tl) this.rig.tl.pause();
     }
 
     destroy() {
       this.stopIdles();
+      if (this.model3d) this.model3d.destroy();
       if (this.rig) this.rig.destroy();
       this.parallaxNode.destroy({ children: true });
     }

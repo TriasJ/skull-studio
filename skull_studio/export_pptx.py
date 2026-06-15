@@ -20,6 +20,7 @@ Design units in the manifest are PDF points (1/72 in); 1 pt = 12700 EMU.
 import argparse
 import io
 import json
+import sys
 from pathlib import Path
 
 from lxml import etree
@@ -29,6 +30,9 @@ from pptx.util import Emu, Pt
 from pptx.dml.color import RGBColor
 from pptx.enum.text import PP_ALIGN, MSO_ANCHOR
 from pptx.enum.shapes import MSO_SHAPE
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import export_model3d  # raw-XML injector for 3D models (run as a script, not a pkg)
 
 P_NS = "http://schemas.openxmlformats.org/presentationml/2006/main"
 
@@ -190,8 +194,9 @@ def main(args):
     blank = prs.slide_layouts[6]
     fmt, q = args.format, args.quality
 
-    n_text = n_pic = n_patch = n_anim = n_clip = 0
-    for slide in manifest["slides"]:
+    n_text = n_pic = n_patch = n_anim = n_clip = n_model3d = 0
+    models_by_slide = {}
+    for si, slide in enumerate(manifest["slides"]):
         s = prs.slides.add_slide(blank)
         bg_path = WORK / slide["background"]["src"]
         bg_img = Image.open(bg_path).convert("RGBA") if bg_path.exists() else None
@@ -205,6 +210,25 @@ def main(args):
         for el in sorted(slide["elements"], key=lambda e: e.get("z", 0)):
             if el.get("hidden"):
                 continue
+
+            # 3D model: collect for raw-XML injection after save (true round-trip).
+            # Falls through to a static preview picture when the GLB is missing.
+            if el["type"] == "model3d" and el.get("modelSrc") and (WORK / el["modelSrc"]).exists():
+                prev = (el.get("model3d") or {}).get("previewSrc")
+                preview = WORK / prev if prev and (WORK / prev).exists() else None
+                if preview is None and (WORK / el["crop"]).exists():
+                    preview = WORK / "models" / (el["id"] + "_prev.png")
+                    preview.parent.mkdir(parents=True, exist_ok=True)
+                    load_rgba(WORK / el["crop"]).save(preview, "PNG")
+                if preview is not None:
+                    models_by_slide.setdefault(si, []).append({
+                        "bbox": el["bbox"], "id": el["id"], "name": el.get("name"),
+                        "text": el.get("text"), "glb": str(WORK / el["modelSrc"]),
+                        "preview": str(preview), "model3d": el.get("model3d") or {},
+                    })
+                    n_model3d += 1
+                    continue
+
             bb = el.get("cropBbox") or el["bbox"]
 
             # optional footprint patch layer, placed just under the element
@@ -286,9 +310,12 @@ def main(args):
 
     DIST.mkdir(exist_ok=True)
     prs.save(str(args.out))
+    if models_by_slide:                 # splice real 3D models back into the saved package
+        export_model3d.inject(args.out, models_by_slide, W_emu, H_emu)
     print(f"Exported {len(manifest['slides'])} slides -> {args.out}")
-    print(f"  {n_text} text boxes, {n_pic} pictures, {n_clip} clips, {n_patch} patch shapes, "
-          f"{n_anim} animations ({fmt.upper()}{', q' + str(q) if fmt == 'jpg' else ''})")
+    print(f"  {n_text} text boxes, {n_pic} pictures, {n_clip} clips, {n_model3d} 3D models, "
+          f"{n_patch} patch shapes, {n_anim} animations "
+          f"({fmt.upper()}{', q' + str(q) if fmt == 'jpg' else ''})")
 
 
 if __name__ == "__main__":

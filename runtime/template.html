@@ -158,8 +158,11 @@
   </div></div>
   <div id="ed-html" class="ed-modal"><div class="box"><h3>Export HTML</h3>
     <div class="row"><label title="bundle the editor so you can press E to edit the shipped file">embed editor</label><input type="checkbox" id="hx-embed"></div>
+    <div class="row" id="hx-three-row"><label title="how three.js ships for decks with 3D models: inline = one self-contained file (heavier); vendor = small HTML + a vendor/ folder beside it">three.js (3D)</label><select id="hx-threejs">
+      <option value="inline" selected>inline (single file)</option><option value="vendor">vendor folder (smaller HTML)</option></select></div>
+    <div class="row" id="hx-embedmodels-row"><label title="base64 the .glb models into the page for a true single file; otherwise they ride in a models/ folder beside the HTML">embed 3D models</label><input type="checkbox" id="hx-embedmodels"></div>
     <div class="row"><label>save to</label><input type="text" id="hx-out" value="dist/presentation.html"><button id="hx-browse" title="browse for a folder">…</button></div>
-    <div id="ed-hint">Single self-contained HTML (PixiJS + GSAP + assets inlined). Live-animated.</div>
+    <div id="ed-hint">Single self-contained HTML (PixiJS + GSAP + assets inlined). Live-animated. three.js is added only when the deck has 3D models.</div>
     <div class="row" style="margin-top:12px;justify-content:flex-end;display:flex;gap:8px">
       <button id="hx-cancel">Cancel</button><button id="hx-go" class="primary">Export</button></div>
   </div></div>
@@ -262,6 +265,7 @@
 <!-- EDITOR:DOM:END -->
 
 {{VENDOR}}
+{{THREE}}
 <script id="manifest" type="application/json">{{MANIFEST}}</script>
 <script>{{ASSETS}}</script>
 <script>{{RUNTIME}}</script>

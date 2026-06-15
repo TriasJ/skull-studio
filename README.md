@@ -178,6 +178,15 @@ going.
 - A real **timeline**: labeled ruler, per-pin rows, draggable playhead and
   keyframes, right-click to delete.
 
+### 3D models (PowerPoint → three.js, round-trip)
+- Decks with **Insert → 3D Models** import automatically: each model becomes a
+  `model3d` element. Works immediately via its 2D preview; renders **live in 3D**
+  (three.js) when available, composited right into the 2D scene.
+- Baked glTF **animations play**; add **auto-rotate** and tune the **camera** in
+  the inspector. three.js ships **inline** (one file) or as a **vendor folder**,
+  your choice at export, and only for decks that actually contain 3D.
+- **Round-trips back to PowerPoint** as real 3D (with a 2D fallback for other apps).
+
 ### Masking, patches & censoring
 - **Polygon cutouts** and FineReader-style **+/− Box / +/− Poly** boolean mask
   editing.
@@ -190,7 +199,7 @@ going.
 | Export | What you get | Best for |
 |---|---|---|
 | **HTML** | one self-contained `.html` (PixiJS+GSAP+assets inlined), live-animated; optional bundled editor (press **E**) | sharing a link/file, embedding, presenting |
-| **PPTX** | editable PowerPoint: OCR text → real text boxes, entrances → Fade, idle/rig motion → looping **mp4/GIF** clips | handing off to PowerPoint users |
+| **PPTX** | editable PowerPoint: OCR text → real text boxes, entrances → Fade, idle/rig motion → looping **mp4/GIF** clips, **3D models round-tripped** as real 3D | handing off to PowerPoint users |
 | **Baked HTML** | no-WebGL DOM slideshow; animated elements are `<video>`/`<img>` | maximum compatibility / low-power devices |
 
 **PPTX options:** PNG or JPEG images (JPEG is ~7× smaller), font-size override,

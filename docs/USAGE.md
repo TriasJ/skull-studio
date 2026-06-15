@@ -106,3 +106,30 @@ single-file editor saves to browser localStorage; **Export overrides.json** then
   (pixels are regenerated on disk); animation/blend/opacity edits are instant.
 - Keep one editor tab open per project (saves use an optimistic lock to avoid a
   stale tab clobbering newer state).
+
+## 3D models (PowerPoint)
+
+Decks created with **Insert → 3D Models** import automatically — each model lands
+as a `model3d` element.
+
+- Out of the box it shows PowerPoint's rendered **preview image**, so it works
+  everywhere (and is the fallback when WebGL is unavailable).
+- With three.js it renders **live**: any animation baked into the model plays, and
+  you can add spin. Select the model and use the **3D model** inspector section:
+  *clip* (baked animation), *loop*, *auto-rotate °/s*, *camera FOV*.
+- **Export → HTML** offers a *three.js* choice: **inline** (one self-contained
+  file, ~0.7 MB heavier) or **vendor folder** (smaller HTML + a `vendor/` folder
+  beside it); *embed 3D models* base64s the `.glb` for a true single file,
+  otherwise they ride in a `models/` folder. three.js is added only when the deck
+  actually contains 3D.
+- **Export → PowerPoint** writes the models back as real 3D (a round-trip);
+  PowerPoint shows the live model, other apps show the preview.
+
+Try it without PowerPoint:
+
+```bash
+node skull_studio/make_sample_glb.mjs     # sphere/cone/torus -> sample/models
+python -m skull_studio.make_sample_3d     # assemble a 1-slide deck in work/
+node skull_studio/build.mjs               # dist/presentation.html (live 3D)
+python -m skull_studio.export_pptx dist/sample3d.pptx   # round-trip
+```

@@ -108,3 +108,34 @@ background region per frame (so the clip is opaque and drops seamlessly back at 
 bbox), then `ffmpeg` encodes mp4 (libx264/yuv420p) or gif (palettegen/paletteuse,
 `--max-dim` downscale). Writes `work/clips/<id>.<ext>` + a poster + `index.json`
 consumed by the exporters.
+
+## 3D models (`extract_model3d.py`, `export_model3d.py`, `51-model3d.js`)
+
+PowerPoint stores inserted 3D models as standard **glTF 2.0 binaries** in
+`ppt/media/model3dN.glb`, wrapped on the slide in
+`<mc:AlternateContent>` → `<mc:Choice Requires="am3d">` (`am3d:model3d`, ns
+`…/2017/model3d`) with a twin `<mc:Fallback>` `<p:pic>` of a rendered preview PNG.
+python-pptx can't see any of this (it skips `mc:AlternateContent`), so we read the
+raw package.
+
+- **Import** — `extract_model3d.parse()` reads, per slide: bbox (graphicFrame
+  `p:xfrm`), the GLB + preview parts (resolved via the slide `.rels`), the camera
+  (`am3d:camera`), transform (`am3d:trans`, 60000ths-degree → radians), the
+  embedded-clip reference (`a3danim:embedAnim @animId/length/count`) and the
+  verbatim `<am3d:model3d>` fragment. `extract_pptx.py` emits a `model3d` element;
+  the preview rides the normal crop pipeline (Tier 1). `extract_pptx._prune_unsupported`
+  strips `mc:AlternateContent`/`p:contentPart` (ink) so python-pptx's shape loop
+  doesn't choke on them.
+- **Runtime** — `51-model3d.js`: each model gets its own offscreen three.js
+  `WebGLRenderer`; its canvas is a `PIXI.Texture` used as the element's `view`, so
+  the existing scene graph composites it (one-writer rule unchanged). `AnimationMixer`
+  plays `gltf.animations[clip]`. three.js is ESM-only, loaded via an import map +
+  a bootstrap module that sets `window.THREE` (read lazily by the classic runtime).
+- **Export** — `export_model3d.inject()` post-processes the saved `.pptx` zip:
+  adds the GLB + preview as parts, wires slide rels (`…/2017/06/relationships/model3d`),
+  and splices `mc:AlternateContent` back in (verbatim `sourceXml` with embed ids
+  repointed, or a regenerated minimal `am3d:model3d` from the manifest). True
+  round-trip; reopens in PowerPoint without "repair".
+- **Build** — `build.mjs` includes three.js only for decks with `model3d` elements:
+  `--threejs inline` (data: URLs in one file) or `--threejs vendor` (sidecar
+  `vendor/` folder); GLBs ride in a `models/` folder unless `--embed-models`.

@@ -119,6 +119,22 @@
       }
       h.push(this.sec("entrance", "Entrance", entRows));
 
+      // --- 3D model (only for model3d elements)
+      if (spec.type === "model3d") {
+        const m3 = spec.model3d || (spec.model3d = {});
+        const clips = (ev.model3d && ev.model3d.clipNames) || [];
+        const m3Rows = [];
+        if (clips.length) {
+          m3Rows.push(row("clip", select("m3-clip", clips, clips[m3.clip ?? 0] ?? clips[0])));
+          m3Rows.push(`<div class="row"><label>loop</label><input type="checkbox" id="m3-loop" ${m3.loop !== false ? "checked" : ""}></div>`);
+        } else {
+          m3Rows.push(`<div id="ed-hint">No baked animation in this model — use auto-rotate below.</div>`);
+        }
+        m3Rows.push(row("auto-rotate &deg;/s", num("m3-rot", m3.autoRotate ?? 0, 5)));
+        m3Rows.push(row("camera FOV", num("m3-fov", (m3.camera && m3.camera.fov) ?? 45, 1)));
+        h.push(this.sec("model3d", "3D model", m3Rows));
+      }
+
       // --- idle
       const idleRows = [];
       for (const name of IDLES) {
@@ -152,7 +168,7 @@
       // --- studio sections
       if (window.STUDIO) {
         h.push(this.sec("element", "Element", [
-          row("type", select("ed-el-type", ["image", "text", "shape"], spec.type)),
+          row("type", select("ed-el-type", ["image", "text", "shape", "model3d"], spec.type)),
           row("z-order", num("ed-z", spec.z ?? 0, 1)),
           `<div id="ed-bbox-ro" class="ed-badge">[${spec.bbox.map((v) => v.toFixed(3)).join(", ")}]${spec.polygon ? " poly:" + spec.polygon.length : ""}${(spec.regions || []).length ? " regions:" + spec.regions.length : ""}</div>`,
         ]));
@@ -253,6 +269,28 @@
       onchange("ent-ease", (e) => { ent.ease = e.target.value; });
       onchange("ent-dir", (e) => { ent.direction = e.target.value; });
       onchange("ent-dist", (e) => { ent.distance = parseFloat(e.target.value); });
+
+      // --- 3D model controls (apply live to the three.js view when loaded)
+      const m3 = spec.model3d || {};
+      onchange("m3-clip", (e) => {
+        m3.clip = e.target.selectedIndex;
+        if (ev.model3d) ev.model3d.setClip(m3.clip, m3.loop !== false);
+      });
+      const m3loop = document.getElementById("m3-loop");
+      if (m3loop) m3loop.onchange = (e) => {
+        m3.loop = e.target.checked;
+        if (ev.model3d) ev.model3d.setClip(m3.clip ?? 0, m3.loop);
+        this.commitSoon(ev);
+      };
+      onchange("m3-rot", (e) => {
+        m3.autoRotate = parseFloat(e.target.value) || 0;
+        if (ev.model3d) ev.model3d.setAutoRotate(m3.autoRotate);
+      });
+      onchange("m3-fov", (e) => {
+        const fov = parseFloat(e.target.value) || 45;
+        m3.camera = Object.assign(m3.camera || {}, { fov });
+        if (ev.model3d) ev.model3d.setFov(fov);
+      });
 
       for (const cb of this.el.querySelectorAll("input[data-idle]")) {
         cb.onchange = () => {

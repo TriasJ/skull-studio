@@ -19,6 +19,7 @@ import re
 import shutil
 import subprocess
 import sys
+import zipfile
 from pathlib import Path
 
 from pptx import Presentation
@@ -26,6 +27,7 @@ from pptx.enum.shapes import MSO_SHAPE_TYPE
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import extract  # reuse render(), run_mineru(), draft()
+import extract_model3d  # raw-XML reader for inserted 3D models (am3d:model3d)
 
 ROOT = Path(__file__).resolve().parent.parent
 WORK = ROOT / "work"
@@ -76,6 +78,27 @@ def mineru(pptx_path: Path) -> None:
     extract.run_mineru(pdf)
 
 
+_MC = "http://schemas.openxmlformats.org/markup-compatibility/2006"
+_P = "http://schemas.openxmlformats.org/presentationml/2006/main"
+
+
+def _prune_unsupported(slide):
+    """Remove spTree children python-pptx's shape factory cannot build.
+
+    Inserted 3D models live in ``mc:AlternateContent`` and ink lives in
+    ``p:contentPart``; iterating either raises ``has_ph_elm`` and aborts the
+    whole slide. We strip them from the in-memory tree only (the file is never
+    written) — 3D models are read from the raw package separately, and ink is
+    not imported. Returns the count removed."""
+    spTree = slide.shapes._spTree
+    removed = 0
+    for child in list(spTree):
+        if child.tag in (f"{{{_MC}}}AlternateContent", f"{{{_P}}}contentPart"):
+            spTree.remove(child)
+            removed += 1
+    return removed
+
+
 def _norm(shape, SW, SH):
     x0, y0 = max(0, shape.left / SW), max(0, shape.top / SH)
     x1 = min(1, (shape.left + shape.width) / SW)
@@ -119,6 +142,7 @@ def draft(pptx_path: Path) -> None:
             el.setdefault("hidden", False)
         if i >= len(slides):
             continue
+        _prune_unsupported(slides[i])   # strip 3D-model/ink elems python-pptx can't build
         shapes = [s for s in slides[i].shapes if s.left is not None and s.width]
         zmax = max([e.get("z", 0) for e in msl["elements"]] + [0])
         pptx_imgs = []
@@ -162,12 +186,55 @@ def draft(pptx_path: Path) -> None:
                 msl["elements"].remove(oi)
                 removed_dup += 1
 
+    # inserted 3D models (invisible to python-pptx; read from raw slide XML)
+    added_models = _add_models(m, pptx_path)
+
     (WORK / "manifest.json").write_text(
         json.dumps(m, indent=2, ensure_ascii=False), encoding="utf-8")
     n = sum(len(s["elements"]) for s in m["slides"])
     print(f"Merged PPTX shapes: +{exact_txt} exact text, +{added_txt} text boxes, "
-          f"+{added_pics} shapes/pictures (-{removed_dup} OCR dups). "
+          f"+{added_pics} shapes/pictures (-{removed_dup} OCR dups), "
+          f"+{added_models} 3D models. "
           f"Total {n} elements across {len(m['slides'])} slides.")
+
+
+def _add_models(m, pptx_path):
+    """Detect inserted 3D models and append them as `model3d` elements.
+
+    The visible crop still comes from the LibreOffice render (which rasterizes
+    each model's 2D fallback preview), so a model already works as a static
+    element with no runtime support; the extra fields enable real 3D later and
+    a loss-free round-trip back to PPTX.
+    """
+    try:
+        models_by_slide = extract_model3d.parse(pptx_path)
+    except Exception as e:                                   # never break import
+        print(f"  (3D model scan skipped: {e})")
+        return 0
+    if not models_by_slide:
+        return 0
+    models_dir = WORK / "models"
+    models_dir.mkdir(parents=True, exist_ok=True)
+    written, n = set(), 0
+    with zipfile.ZipFile(str(pptx_path)) as z:
+        names = set(z.namelist())
+        for i, msl in enumerate(m["slides"]):
+            for info in models_by_slide.get(i, []):
+                if not info.get("bbox"):
+                    continue
+                z_next = max([e.get("z", 0) for e in msl["elements"]] + [0]) + 1
+                msl["elements"].append(_model3d_el(msl["id"], z_next, info))
+                for part in (info.get("glb_part"), info.get("preview_part")):
+                    if part and part in names and part not in written:
+                        (models_dir / part.rsplit("/", 1)[-1]).write_bytes(z.read(part))
+                        written.add(part)
+                n += 1
+            # OCR image regions hidden behind a model are duplicates of its preview
+            mboxes = [info["bbox"] for info in models_by_slide.get(i, []) if info.get("bbox")]
+            for oi in [e for e in msl["elements"] if e["type"] == "image"]:
+                if any(_overlaps(oi["bbox"], mb) > 0.5 for mb in mboxes):
+                    msl["elements"].remove(oi)
+    return n
 
 
 def _base(sid, z, bbox, etype, role, text=""):
@@ -186,6 +253,31 @@ def _text_el(sid, z, bbox, text):
 
 def _img_el(sid, z, bbox):
     return _base(sid, z, bbox, "image", "figure")
+
+
+def _model3d_el(sid, z, info):
+    """Build a `model3d` element from an extract_model3d.parse() entry.
+
+    `crop` (the rendered preview) is the Tier-1 display + universal fallback;
+    `modelSrc`/`model3d` enable three.js rendering and PPTX round-trip.
+    """
+    el = _base(sid, z, info["bbox"], "model3d", "figure", info.get("descr") or "")
+    el["name"] = info.get("name")
+    el["parallax"] = 0.04                                    # models read as foreground
+    base = lambda part: part.rsplit("/", 1)[-1] if part else None
+    el["modelSrc"] = f"models/{base(info['glb_part'])}" if info.get("glb_part") else None
+    anim = info.get("anim") or {}
+    el["model3d"] = {
+        "clip": anim.get("clip", 0) if anim else None,
+        "loop": anim.get("loop", False),
+        "durationMs": anim.get("durationMs"),
+        "autoRotate": 0,                                     # editor-added emphasis (deg/s)
+        "camera": info.get("camera"),
+        "transform": info.get("transform"),
+        "previewSrc": f"models/{base(info['preview_part'])}" if info.get("preview_part") else None,
+        "sourceXml": info.get("source_xml"),                # verbatim, for round-trip export
+    }
+    return el
 
 
 if __name__ == "__main__":

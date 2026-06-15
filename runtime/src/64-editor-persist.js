@@ -5,7 +5,8 @@
   "use strict";
   const S = window.SKULL;
   const KEYS = ["entrance", "idle", "parallax", "rig", "cleanup", "blendMode", "opacity",
-                "hidden", "blurRadius", "fillColor", "regions", "polygon", "bbox", "name", "z"];
+                "hidden", "blurRadius", "fillColor", "regions", "polygon", "bbox", "name", "z",
+                "model3d", "modelSrc"];
 
   class Persist {
     constructor(manifest) {

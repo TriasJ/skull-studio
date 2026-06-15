@@ -24,6 +24,7 @@ dependencies = [
     "opencv-python>=4.8",
     "jsonschema>=4.20",
     "python-pptx>=1.0",
+    "lxml>=4.9",            # raw OOXML read/write (3D models, PPTX timing)
     "rapidocr-onnxruntime>=1.3",
 ]
 

@@ -11,9 +11,11 @@ ROOT = Path(__file__).resolve().parent.parent
 WORK = ROOT / "work"
 
 ENTRANCES = {"fadeIn", "fadeUp", "fadeDown", "fadeLeft", "fadeRight", "scaleIn",
-             "maskReveal", "blurIn", "drawOn", "staggerText", "none"}
-IDLES = {"float", "pulse", "sway", "shimmer", "breath", "meshWave", "kenBurns", "none"}
-TYPES = {"text", "image", "shape"}
+             "maskReveal", "blurIn", "drawOn", "staggerText", "none",
+             "rotateIn", "scaleIn3D"}                       # 3D-model entrances
+IDLES = {"float", "pulse", "sway", "shimmer", "breath", "meshWave", "kenBurns",
+         "none", "autoRotate"}                              # autoRotate = 3D spin
+TYPES = {"text", "image", "shape", "model3d"}
 CLEANUPS = {"none", "fill", "blur", "auto"}
 
 
@@ -61,6 +63,12 @@ def main(path: Path):
                 errors.append(f"{eid}: patch missing on disk: {patch}")
             if el.get("cleanup") == "fill" and not el.get("fillColor"):
                 errors.append(f"{eid}: cleanup=fill but no fillColor")
+            if el.get("type") == "model3d":
+                src = el.get("modelSrc")
+                if not src:
+                    warns.append(f"{eid}: model3d without modelSrc (preview-only)")
+                elif not (WORK / src).exists():
+                    warns.append(f"{eid}: model glb missing on disk: {src}")
 
     for w in warns:
         print("WARN ", w)

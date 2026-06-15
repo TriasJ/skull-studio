@@ -90,6 +90,16 @@
       // graceful degradation: without lines[] sub-crops, wipe down instead
       entrance.maskReveal(ev, { ...spec, direction: "down", duration: spec.duration || 1 }, tl);
     },
+
+    // ---- 3D-model entrances (fall back to the 2D move when no live model) ----
+    scaleIn3D(ev, spec, tl) { entrance.scaleIn(ev, spec, tl); },
+
+    rotateIn(ev, spec, tl) {
+      entrance.fadeIn(ev, spec, tl);
+      if (ev.model3d) {
+        tl.add(() => ev.model3d.entranceSpin(spec.turns ?? 1, spec.duration || 1), spec.delay || 0);
+      }
+    },
   };
 
   function dirFade(ev, spec, tl, sx, sy) {
@@ -158,6 +168,12 @@
         yoyo: spec.yoyo !== false, repeat: -1, ease: "sine.inOut",
         onInterrupt: () => node.scale.set(1),
       }));
+    },
+    autoRotate(ev, spec) {                 // continuous 3D spin (deg/sec)
+      if (!ev.model3d) return { stop() {} };
+      const dps = spec.degrees ?? spec.amount ?? 30;
+      ev.model3d.setAutoRotate(dps);
+      return { stop() { ev.model3d.setAutoRotate(0); } };
     },
     meshWave(ev, spec) {
       if (!(ev.view instanceof PIXI.MeshPlane) || ev.rig) return { stop() {} };

@@ -191,6 +191,10 @@ def _build_html_cmds(opts):
     cmd = ["node", SCRIPTS / "build.mjs", "--out", str(out)]
     if opts.get("embedEditor"):
         cmd += ["--embed-editor"]
+    if opts.get("threejs") == "vendor":          # 3D-model engine delivery
+        cmd += ["--threejs", "vendor"]
+    if opts.get("embedModels"):
+        cmd += ["--embed-models"]
     return [cmd]
 
 
