@@ -9,6 +9,7 @@ poster PNG and an index (work/clips/index.json) consumed by the exporters.
 Usage: python -m skull_studio.render_clips [--format mp4|gif] [--fps 18] [--max-dur 6]
 """
 import argparse
+import hashlib
 import json
 import math
 import shutil
@@ -19,7 +20,7 @@ from pathlib import Path
 
 import cv2
 import numpy as np
-from PIL import Image
+from PIL import Image, ImageDraw
 
 ROOT = Path(__file__).resolve().parent.parent
 WORK = ROOT / "work"
@@ -27,6 +28,15 @@ CLIPS = WORK / "clips"
 FFMPEG = shutil.which("ffmpeg") or "ffmpeg"
 MESH_IDLE = ("wave", "ripple", "swirl", "meshWave")        # vertex-displacement effects
 EXPORT_IDLE = ("breath", "float", "sway", "pulse", "shimmer", "glow") + MESH_IDLE
+
+# particle presets — mirror runtime/src/52-particles.js PRESETS (values must agree)
+PARTICLE_PRESETS = {
+    "sparkle": dict(rate=24, life=(0.6, 1.4), size=(0.02, 0.06), speed=(0.0, 0.05), dir="any",  gravity=0.0,   blend="add",    color=0xfff2b0, twinkle=True,  sway=0.0,  region="area"),
+    "snow":    dict(rate=18, life=(3, 6),     size=(0.015, 0.04), speed=(0.03, 0.08), dir="down", gravity=0.02,  blend="normal", color=0xffffff, twinkle=False, sway=0.05, region="top"),
+    "embers":  dict(rate=20, life=(1, 2.5),   size=(0.015, 0.05), speed=(0.06, 0.14), dir="up",   gravity=-0.03, blend="add",    color=0xff7a2a, twinkle=True,  sway=0.0,  region="bottom"),
+    "floatUp": dict(rate=14, life=(2, 4),     size=(0.02, 0.06),  speed=(0.04, 0.09), dir="up",   gravity=-0.01, blend="add",    color=0xbfe0ff, twinkle=False, sway=0.0,  region="bottom"),
+    "bubbles": dict(rate=12, life=(2.5, 5),   size=(0.02, 0.07),  speed=(0.03, 0.08), dir="up",   gravity=-0.01, blend="screen", color=0xaad8ff, twinkle=False, sway=0.06, region="bottom"),
+}
 
 
 # ---------------------------------------------------------------- easing
@@ -210,6 +220,9 @@ def loop_duration(el, default=4.0, cap=6.0):
     d = 0.0
     for i in el.get("idle", []):
         d = max(d, i.get("period", 4.0))
+        if i["type"] == "particles":          # loop long enough for a full lifecycle
+            p = PARTICLE_PRESETS.get(i.get("preset"), PARTICLE_PRESETS["sparkle"])
+            d = max(d, min(p["life"][1], cap))
     if el.get("rig") and el["rig"].get("anim", {}).get("tracks"):
         d = max(d, el["rig"]["anim"].get("duration", 3.0))
     return min(d or default, cap)
@@ -333,6 +346,153 @@ def render_frame(el, crop_rgba, rig, t, dur, cropH_norm):
     return img
 
 
+# ---------------------------------------------------------------- particles (HTML parity)
+# A deterministic, loop-periodic re-implementation of 52-particles.js. The browser
+# emitter is stochastic and continuous; here we pre-generate a fixed, seeded set of
+# particles whose ages are read modulo the clip duration, so every particle fades in
+# and out within the loop and frame 0 == frame N (seamless mp4/GIF). It won't match
+# the live HTML frame-for-frame, but reproduces the same preset look.
+_STAMP_CACHE = {}
+
+
+def _star_pts(cx, cy, spikes, outer, inner):
+    pts, rot, step = [], -math.pi / 2, math.pi / spikes
+    for _ in range(spikes):
+        pts.append((cx + math.cos(rot) * outer, cy + math.sin(rot) * outer)); rot += step
+        pts.append((cx + math.cos(rot) * inner, cy + math.sin(rot) * inner)); rot += step
+    return pts
+
+
+def _stamp_mask(shape):
+    """64x64 float[0,1] alpha mask for a built-in particle shape."""
+    if shape in _STAMP_CACHE:
+        return _STAMP_CACHE[shape]
+    if shape == "dot":
+        yy, xx = np.mgrid[0:64, 0:64]
+        r = np.sqrt((xx - 32.0) ** 2 + (yy - 32.0) ** 2) / 32.0
+        m = np.clip(1.0 - r, 0, 1).astype(np.float32) ** 1.5
+    else:
+        im = Image.new("L", (64, 64), 0); d = ImageDraw.Draw(im)
+        if shape == "circle":     d.ellipse([6, 6, 58, 58], fill=255)
+        elif shape == "ring":     d.ellipse([7, 7, 57, 57], outline=255, width=7)
+        elif shape == "square":   d.rectangle([8, 8, 56, 56], fill=255)
+        elif shape == "triangle": d.polygon([(32, 6), (58, 58), (6, 58)], fill=255)
+        elif shape == "star":     d.polygon(_star_pts(32, 32, 5, 26, 11.7), fill=255)
+        else:                     d.ellipse([6, 6, 58, 58], fill=255)
+        m = np.asarray(im, np.float32) / 255.0
+    _STAMP_CACHE[shape] = m
+    return m
+
+
+def build_particle_systems(el, box_w, box_h, dur):
+    """Pre-generate seeded particle sets (one per `particles` idle) for an element."""
+    systems = []
+    for spec in el.get("idle", []):
+        if spec["type"] != "particles":
+            continue
+        p = PARTICLE_PRESETS.get(spec.get("preset"), PARTICLE_PRESETS["sparkle"])
+        rate = float(spec.get("rate", p["rate"]))
+        size_mul = float(spec.get("size", 1.0))
+        # colour: explicit hex overrides the preset tint
+        col = p["color"]
+        hexc = str(spec.get("color") or "").lstrip("#")
+        if len(hexc) >= 6:
+            col = int(hexc[:6], 16)
+        color_rgb = np.array([(col >> 16) & 255, (col >> 8) & 255, col & 255], np.float32) / 255.0
+        # custom uploaded sprite: keep its own RGB, use its alpha as the mask
+        stamp_rgb, mask = None, None
+        if spec.get("shape") == "custom" and spec.get("texture"):
+            tp = WORK / spec["texture"]
+            if tp.exists():
+                im = np.asarray(Image.open(tp).convert("RGBA"), np.float32)
+                mask = im[:, :, 3] / 255.0
+                stamp_rgb = im[:, :, :3] / 255.0
+        if mask is None:
+            mask = _stamp_mask("dot" if spec.get("shape") == "custom" else spec.get("shape", "dot"))
+
+        n = int(round(rate * dur)); n = max(1, min(n, 600))
+        seed = int(hashlib.md5((el["id"] + str(spec.get("preset"))).encode()).hexdigest()[:8], 16)
+        rng = np.random.default_rng(seed)
+        u = rng.random
+        s0 = u(n) * dur                                  # spawn time
+        x0 = (u(n) - 0.5) * box_w
+        if p["region"] == "top":      y0 = np.full(n, -box_h / 2.0)
+        elif p["region"] == "bottom": y0 = np.full(n,  box_h / 2.0)
+        else:                         y0 = (u(n) - 0.5) * box_h
+        speed = (p["speed"][0] + u(n) * (p["speed"][1] - p["speed"][0])) * box_h
+        vx = (u(n) - 0.5) * 0.04 * box_h
+        if p["dir"] == "down":   vy = speed
+        elif p["dir"] == "up":   vy = -speed
+        else:
+            a = u(n) * 2 * math.pi
+            vx = vx + np.cos(a) * speed; vy = np.sin(a) * speed
+        if np.isscalar(vy):
+            vy = np.full(n, vy)
+        life = p["life"][0] + u(n) * (p["life"][1] - p["life"][0])
+        size = (p["size"][0] + u(n) * (p["size"][1] - p["size"][0])) * box_h * size_mul * 2.0
+        phase = u(n) * 6.28
+        systems.append(dict(
+            s=s0, x0=x0, y0=y0, vx=vx, vy=vy, life=life, size=size, phase=phase,
+            grav=p["gravity"] * box_h, sway=p["sway"] * box_h, twinkle=p["twinkle"],
+            blend=p["blend"], color=color_rgb, mask=mask, stamp_rgb=stamp_rgb, rcache={},
+        ))
+    return systems
+
+
+def _resized(sys, sp):
+    """cache resized (mask[,rgb]) stamps by integer pixel size."""
+    if sp in sys["rcache"]:
+        return sys["rcache"][sp]
+    m = cv2.resize(sys["mask"], (sp, sp), interpolation=cv2.INTER_LINEAR)
+    rgb = None
+    if sys["stamp_rgb"] is not None:
+        rgb = cv2.resize(sys["stamp_rgb"], (sp, sp), interpolation=cv2.INTER_LINEAR)
+    sys["rcache"][sp] = (m, rgb)
+    return m, rgb
+
+
+def render_particles(frame, systems, t, dur, cx, cy):
+    """Draw all particle systems onto an opaque RGB frame at element centre (cx,cy)."""
+    H, W = frame.shape[:2]
+    for sys in systems:
+        age = np.mod(t - sys["s"], dur)
+        alive = age < sys["life"]
+        if not alive.any():
+            continue
+        idx = np.nonzero(alive)[0]
+        ph = sys["phase"] + 2.0 * age
+        # analytic integration of the JS Euler step (pos, gravity, sway)
+        xs = cx + sys["x0"] + sys["vx"] * age
+        if sys["sway"]:
+            xs += (sys["sway"] / 2.0) * (np.sin(ph) - np.sin(sys["phase"]))
+        ys = cy + sys["y0"] + sys["vy"] * age + 0.5 * sys["grav"] * age * age
+        k = 1.0 - age / sys["life"]
+        a = np.where(k < 0.2, k / 0.2, np.where(k > 0.85, (1 - k) / 0.15, 1.0))
+        if sys["twinkle"]:
+            a = a * (0.5 + 0.5 * np.sin(ph * 3))
+        add = sys["blend"] in ("add", "screen")
+        col = sys["color"]
+        for i in idx:
+            sp = int(sys["size"][i])
+            if sp < 2:
+                continue
+            x0 = int(xs[i] - sp / 2); y0 = int(ys[i] - sp / 2)
+            fx0, fy0 = max(0, x0), max(0, y0)
+            fx1, fy1 = min(W, x0 + sp), min(H, y0 + sp)
+            if fx1 <= fx0 or fy1 <= fy0:
+                continue
+            m, rgb = _resized(sys, sp)
+            sm = m[fy0 - y0:fy1 - y0, fx0 - x0:fx1 - x0] * float(a[i])
+            src = (rgb[fy0 - y0:fy1 - y0, fx0 - x0:fx1 - x0] * col if rgb is not None else col)
+            src = src * 255.0
+            am = sm[:, :, None]
+            dst = frame[fy0:fy1, fx0:fx1].astype(np.float32)
+            if add:
+                frame[fy0:fy1, fx0:fx1] = np.clip(dst + src * am, 0, 255).astype(np.uint8)
+            else:
+                frame[fy0:fy1, fx0:fx1] = np.clip(src * am + dst * (1 - am), 0, 255).astype(np.uint8)
+
+
 # ---------------------------------------------------------------- compositing + encode
 def composite(bg_patch_rgb, crop_rgba, ox, oy):
     """alpha-composite an RGBA crop onto an opaque RGB canvas at (ox,oy)."""
@@ -390,7 +550,8 @@ def main(args):
                 continue
             has_idle = any(i["type"] in EXPORT_IDLE for i in el.get("idle", []))
             has_rig = bool(el.get("rig") and el["rig"].get("anim", {}).get("tracks"))
-            if not (has_idle or has_rig) or el.get("hidden"):
+            has_particles = any(i["type"] == "particles" for i in el.get("idle", []))
+            if not (has_idle or has_rig or has_particles) or el.get("hidden"):
                 continue
             crop_path = WORK / el["crop"]
             if not crop_path.exists():
@@ -416,6 +577,12 @@ def main(args):
             fps = args.fps if args.format == "mp4" else min(args.fps, 15)
             frames = max(2, round(dur * fps))
 
+            # particle systems emit around the element box centre (in canvas px)
+            bb = el["bbox"]
+            systems = build_particle_systems(el, (bb[2] - bb[0]) * BW, (bb[3] - bb[1]) * BH, dur) if has_particles else []
+            pcx = (bb[0] + bb[2]) / 2 * BW - px0
+            pcy = (bb[1] + bb[3]) / 2 * BH - py0
+
             with tempfile.TemporaryDirectory() as td:
                 td = Path(td)
                 for fi in range(frames):
@@ -423,6 +590,8 @@ def main(args):
                     rc = render_frame(el, crop, rig, t, dur, cropH_norm)
                     frame = base.copy()
                     composite(frame, rc, ox, oy)
+                    if systems:
+                        render_particles(frame, systems, t, dur, pcx, pcy)
                     Image.fromarray(frame).save(td / f"f_{fi:04d}.png")
                 ext = args.format
                 out = CLIPS / f"{el['id']}.{ext}"

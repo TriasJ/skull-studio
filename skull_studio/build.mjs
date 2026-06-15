@@ -61,6 +61,8 @@ for (const s of manifest.slides) {
     if (el.crop) assetPaths.add(el.crop);
     if (el.patch) assetPaths.add(el.patch);
     if (el.type === "model3d" && el.modelSrc) modelSrcs.add(el.modelSrc);
+    // custom particle sprites (idle particles with an uploaded texture)
+    for (const idle of el.idle || []) if (idle.type === "particles" && idle.texture) assetPaths.add(idle.texture);
   }
 }
 const hasModels = modelSrcs.size > 0;

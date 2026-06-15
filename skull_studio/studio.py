@@ -449,7 +449,8 @@ class Handler(BaseHTTPRequestHandler):
                 req = json.loads(body.decode("utf-8"))
                 rel = str(req.get("path", ""))
                 durl = str(req.get("dataURL", ""))
-                if (not (rel.startswith("crops/") or rel.startswith("models/"))) or ".." in rel:
+                if (not (rel.startswith("crops/") or rel.startswith("models/")
+                         or rel.startswith("particles/"))) or ".." in rel:
                     return self._send(400, {"error": "bad asset path"})
                 data = base64.b64decode(durl.split(",", 1)[1] if "," in durl else durl)
                 dest = (WORK / rel).resolve()

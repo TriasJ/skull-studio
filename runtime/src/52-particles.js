@@ -1,30 +1,49 @@
 /* Rudimentary particle emitter — an `idle` effect for raster elements.
 
-   Spawns lightweight sprites (a shared soft-dot texture) within the element box,
-   advanced by the Pixi ticker. Lives under the element's idleNode so it inherits
-   the element's transforms/parallax. HTML-only: it does NOT bake to PPTX/video
-   (render_clips.py leaves such elements static — by design).
+   Spawns lightweight sprites (a chosen built-in shape, or a custom PNG/sprite the
+   user uploads) within the element box, advanced by the Pixi ticker. Lives under
+   the element's idleNode so it inherits transforms/parallax.
 
-   Sizes/speeds are fractions of the element's box height (resolution-independent). */
+   Bakes to PPTX/baked-HTML video too: render_clips.py reproduces the same preset
+   physics deterministically (seeded, loop-periodic). Sizes/speeds are fractions of
+   the element's box height (resolution-independent). */
 (function () {
   "use strict";
   const S = window.SKULL;
   if (!S) return;
 
-  let _tex = null;
-  function dotTexture() {
-    if (_tex) return _tex;
-    const c = document.createElement("canvas");
-    c.width = c.height = 64;
+  const SHAPES = ["dot", "circle", "ring", "square", "triangle", "star", "custom"];
+  const _cache = {};
+  function star(g, cx, cy, spikes, outer, inner) {
+    let rot = -Math.PI / 2; const step = Math.PI / spikes;
+    g.beginPath(); g.moveTo(cx + Math.cos(rot) * outer, cy + Math.sin(rot) * outer);
+    for (let i = 0; i < spikes; i++) {
+      rot += step; g.lineTo(cx + Math.cos(rot) * inner, cy + Math.sin(rot) * inner);
+      rot += step; g.lineTo(cx + Math.cos(rot) * outer, cy + Math.sin(rot) * outer);
+    }
+    g.closePath();
+  }
+  function shapeTexture(shape) {
+    shape = shape || "dot";
+    if (_cache[shape]) return _cache[shape];
+    const c = document.createElement("canvas"); c.width = c.height = 64;
     const g = c.getContext("2d");
-    const grd = g.createRadialGradient(32, 32, 0, 32, 32, 32);
-    grd.addColorStop(0, "rgba(255,255,255,1)");
-    grd.addColorStop(0.4, "rgba(255,255,255,0.65)");
-    grd.addColorStop(1, "rgba(255,255,255,0)");
-    g.fillStyle = grd;
-    g.beginPath(); g.arc(32, 32, 32, 0, Math.PI * 2); g.fill();
-    _tex = PIXI.Texture.from(c);
-    return _tex;
+    g.fillStyle = "#fff"; g.strokeStyle = "#fff"; g.lineWidth = 7;
+    const cx = 32, cy = 32, r = 26, TAU = Math.PI * 2;
+    if (shape === "circle") { g.beginPath(); g.arc(cx, cy, r, 0, TAU); g.fill(); }
+    else if (shape === "ring") { g.beginPath(); g.arc(cx, cy, r - 3, 0, TAU); g.stroke(); }
+    else if (shape === "square") { g.fillRect(cx - r, cy - r, 2 * r, 2 * r); }
+    else if (shape === "triangle") { g.beginPath(); g.moveTo(cx, cy - r); g.lineTo(cx + r, cy + r); g.lineTo(cx - r, cy + r); g.closePath(); g.fill(); }
+    else if (shape === "star") { star(g, cx, cy, 5, r, r * 0.45); g.fill(); }
+    else { // "dot" (soft radial) — also the fallback
+      const grd = g.createRadialGradient(cx, cy, 0, cx, cy, 32);
+      grd.addColorStop(0, "rgba(255,255,255,1)");
+      grd.addColorStop(0.4, "rgba(255,255,255,0.65)");
+      grd.addColorStop(1, "rgba(255,255,255,0)");
+      g.fillStyle = grd; g.beginPath(); g.arc(cx, cy, 32, 0, TAU); g.fill();
+    }
+    _cache[shape] = PIXI.Texture.from(c);
+    return _cache[shape];
   }
 
   // region: where particles spawn ("top" edge, "bottom" edge, or "area")
@@ -45,11 +64,15 @@
     const sizeMul = spec.size ?? 1;
     const color = spec.color != null ? parseColor(spec.color) : p.color;
     const box = ev.box;
-    const tex = dotTexture();
     const cont = new PIXI.Container();
     ev.idleNode.addChild(cont);
     const parts = [];
     let acc = 0;
+    // texture: built-in shape, or a custom uploaded PNG/sprite (loaded async)
+    let tex = shapeTexture(spec.shape === "custom" ? "dot" : spec.shape);
+    if (spec.shape === "custom" && spec.texture) {
+      S.assets.texture(spec.texture).then((t) => { tex = t; }).catch(() => {});
+    }
 
     function spawn() {
       const sp = new PIXI.Sprite(tex);
@@ -99,5 +122,5 @@
     };
   }
 
-  S.Particles = { make, presets: Object.keys(PRESETS) };
+  S.Particles = { make, presets: Object.keys(PRESETS), shapes: SHAPES };
 })();

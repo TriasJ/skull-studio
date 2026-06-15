@@ -18,11 +18,18 @@ loose [semantic versioning](https://semver.org/) while pre-1.0.
 - **Apply background idle to all slides** (Tools menu) — push a Ken-Burns/idle to
   every slide at once.
 
-### Particle system (HTML)
+### Particle system
 - New `particles` idle effect with presets **sparkle / snow / embers / floatUp /
-  bubbles** (rate + size in the inspector). A lightweight ticker-driven emitter
-  (shared soft-dot texture) under the element, sizes/speeds relative to the box.
-  HTML-only — leaves the element static in PPTX/baked video (by design).
+  bubbles**. A lightweight ticker-driven emitter under the element, sizes/speeds
+  relative to the box.
+- **Particle controller** in the inspector: **preset**, **shape**, **rate**, **size**
+  and **colour**. Built-in shapes — **dot / circle / ring / square / triangle / star** —
+  plus **custom**: upload a small **PNG/sprite with alpha** (Studio) to use as the
+  particle (stored under `work/particles/`, inlined into single-file builds).
+- **Now bakes to PPTX & baked-HTML video** — `render_clips.py` reproduces each preset's
+  physics with a *deterministic, loop-periodic* simulation (seeded particles, ages read
+  modulo the clip duration so every particle fades in/out within the loop and frame 0 ==
+  frame N — seamless). It mirrors the preset look rather than the live RNG frame-for-frame.
 
 ### 2D effect pack
 - New looping idle effects on raster elements: **glow** (pulsing additive bloom via a

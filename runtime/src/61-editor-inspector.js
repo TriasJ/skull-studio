@@ -154,9 +154,18 @@
         if (on && name === "particles") {
           const idle = idles.find((i) => i.type === name);
           const presets = (S.Particles && S.Particles.presets) || ["sparkle"];
+          const shapes = (S.Particles && S.Particles.shapes) || ["dot"];
           idleRows.push(row("&nbsp;&nbsp;preset", select("idle-preset-particles", presets, idle.preset || "sparkle")));
+          idleRows.push(row("&nbsp;&nbsp;shape", select("idle-shape-particles", shapes, idle.shape || "dot")));
           idleRows.push(row("&nbsp;&nbsp;rate", num("idle-rate-particles", idle.rate ?? 20, 2)));
           idleRows.push(row("&nbsp;&nbsp;size", num("idle-size-particles", idle.size ?? 1, 0.1)));
+          idleRows.push(`<div class="row"><label>&nbsp;&nbsp;color</label><input type="color" id="idle-color-particles" value="${idle.color || "#ffffff"}"></div>`);
+          if (idle.shape === "custom" && window.STUDIO) {
+            idleRows.push(`<div class="row"><label>&nbsp;&nbsp;image</label>
+              <button class="ed-btn" id="idle-tex-particles">${idle.texture ? "change…" : "upload PNG…"}</button>
+              <input type="file" id="idle-texfile-particles" accept="image/png,image/webp" style="display:none"></div>`);
+            if (idle.texture) idleRows.push(`<div class="ed-badge">&nbsp;&nbsp;${idle.texture.split("/").pop()}</div>`);
+          }
         } else if (on) {
           const idle = idles.find((i) => i.type === name);
           const amt = idle.amplitude ?? idle.amount ?? idle.degrees ?? 0.02;
@@ -393,6 +402,38 @@
         const idle = spec.idle.find((i) => i.type === "particles");
         if (idle) idle.size = parseFloat(e.target.value);
       });
+      const pShape = document.getElementById("idle-shape-particles");
+      if (pShape) pShape.onchange = (e) => {
+        const idle = spec.idle.find((i) => i.type === "particles");
+        if (idle) { idle.shape = e.target.value; this.commit(ev); this.show(ev); }   // re-render: toggles upload row
+      };
+      onchange("idle-color-particles", (e) => {
+        const idle = spec.idle.find((i) => i.type === "particles");
+        if (idle) { idle.color = e.target.value; this.commit(ev); }
+      });
+      const texBtn = document.getElementById("idle-tex-particles");
+      const texFile = document.getElementById("idle-texfile-particles");
+      if (texBtn && texFile) {
+        texBtn.onclick = () => texFile.click();
+        texFile.onchange = () => {
+          const f = texFile.files && texFile.files[0];
+          if (!f) return;
+          const reader = new FileReader();
+          reader.onload = async () => {
+            // sanitize name + unique suffix so the asset cache never serves a stale texture
+            const safe = f.name.replace(/[^a-z0-9._-]/gi, "_");
+            const rel = `particles/${spec.id}_${this._texSeq = (this._texSeq || 0) + 1}_${safe}`;
+            const res = await fetch("/api/asset", {
+              method: "POST", headers: { "content-type": "application/json" },
+              body: JSON.stringify({ path: rel, dataURL: reader.result }),
+            });
+            if (!res.ok) { texBtn.textContent = "upload failed"; return; }
+            const idle = spec.idle.find((i) => i.type === "particles");
+            if (idle) { idle.texture = rel; this.commit(ev); this.show(ev); }
+          };
+          reader.readAsDataURL(f);
+        };
+      }
 
       onchange("ed-blend", (e) => {
         spec.blendMode = e.target.value;
