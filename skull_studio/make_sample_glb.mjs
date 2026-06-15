@@ -136,7 +136,13 @@ function buildGLB({ pos, nor, idx }, color, anim) {
     asset: { version: "2.0", generator: "skull-studio make_sample_glb" },
     scene: 0,
     scenes: [{ nodes: [0] }],
-    nodes: [{ mesh: 0 }],
+    // node 0 is an untouched root group; the mesh lives in child node 1 and the
+    // animation targets THAT. PowerPoint drives the root transform itself and
+    // ignores animation on the root node, so animating a child is what makes the
+    // clip play in PowerPoint (three.js plays either way).
+    // names matter: three.js binds animation tracks to nodes BY NAME (PowerPoint
+    // uses the node index, so names don't affect it) — unnamed nodes won't animate.
+    nodes: [{ name: "root", children: [1] }, { name: "spin", mesh: 0 }],
     meshes: [{ primitives: [{ attributes: { POSITION: 0, NORMAL: 1 }, indices: 2, material: 0, mode: 4 }] }],
     materials: [{
       pbrMetallicRoughness: { baseColorFactor: [...color, 1], metallicFactor: 0.25, roughnessFactor: 0.45 },
@@ -158,7 +164,7 @@ function buildGLB({ pos, nor, idx }, color, anim) {
     gltf.animations = [{
       name: "tumble",
       samplers: [{ input: 3, output: 4, interpolation: "LINEAR" }],
-      channels: [{ sampler: 0, target: { node: 0, path: "rotation" } }],
+      channels: [{ sampler: 0, target: { node: 1, path: "rotation" } }],
     }];
   }
 
