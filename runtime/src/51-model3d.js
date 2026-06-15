@@ -103,6 +103,7 @@
       if (t.scale) this.root.scale.set(t.scale[0], t.scale[1], t.scale[2]);
       this.scene.add(this.root);
       this._frameCamera(THREE);
+      this._initOrbit(THREE);
       this._lights(THREE);
 
       this.clips = gltf.animations || [];
@@ -120,6 +121,7 @@
       this.ready = true;
       Manager._ensureTicker();
       this._frame(0);                   // paint at least once
+      this.setControls(this.m3.orbit);  // interactive camera if enabled
       if (this.running || !this._pausedExplicitly) this.resume();
     }
 
@@ -133,6 +135,93 @@
       this.camera.position.set(c.x, c.y, c.z + dist);
       this.camera.lookAt(c);
       this.center = c;
+    }
+
+    /* orbit/pan/zoom state: spherical camera offset around a movable target */
+    _initOrbit(THREE) {
+      this.target = this.center.clone();
+      const off = this.camera.position.clone().sub(this.target);
+      this._r = off.length() || 1;
+      this._theta = Math.atan2(off.x, off.z);
+      this._phi = Math.acos(S.clamp(off.y / this._r, -1, 1));
+      // remember the framed view so "Reset view" can restore it
+      this._home = { r: this._r, theta: this._theta, phi: this._phi, target: this.target.clone() };
+    }
+
+    _applyCamera() {
+      const THREE = window.THREE;
+      const sp = Math.sin(this._phi);
+      const off = new THREE.Vector3(
+        this._r * sp * Math.sin(this._theta), this._r * Math.cos(this._phi), this._r * sp * Math.cos(this._theta));
+      this.camera.position.copy(this.target).add(off);
+      this.camera.lookAt(this.target);
+      this._frame(0);                   // render immediately (also works when idle)
+    }
+
+    resetView() {                       // inspector "Reset view" -> framed home
+      const h = this._home;
+      if (!h) return;
+      this._r = h.r; this._theta = h.theta; this._phi = h.phi; this.target = h.target.clone();
+      this._applyCamera();
+    }
+
+    /* drag to orbit, shift/right-drag to pan, wheel to zoom (Pixi federated
+       events on the model's sprite; stops propagation so it doesn't also
+       navigate the slide). Toggled per-model via spec.model3d.orbit. */
+    setControls(on) {
+      this.m3.orbit = !!on;
+      const view = this.ev && this.ev.view;
+      if (!view || view.destroyed) return;
+      if (on && !this._ctl) {
+        const THREE = window.THREE;
+        view.eventMode = "static";
+        view.cursor = "grab";
+        let drag = false, pan = false, lx = 0, ly = 0;
+        const down = (e) => {
+          drag = true;
+          pan = !!(e.shiftKey || e.button === 1 || e.button === 2);
+          lx = e.global.x; ly = e.global.y; view.cursor = "grabbing";
+          if (e.stopPropagation) e.stopPropagation();
+        };
+        const move = (e) => {
+          if (!drag) return;
+          const dx = e.global.x - lx, dy = e.global.y - ly;
+          lx = e.global.x; ly = e.global.y;
+          if (pan) {
+            const right = new THREE.Vector3().setFromMatrixColumn(this.camera.matrix, 0);
+            const up = new THREE.Vector3().setFromMatrixColumn(this.camera.matrix, 1);
+            const s = this._r * 0.0016;
+            this.target.addScaledVector(right, -dx * s).addScaledVector(up, dy * s);
+          } else {
+            this._theta -= dx * 0.01;
+            this._phi = S.clamp(this._phi - dy * 0.01, 0.05, Math.PI - 0.05);
+          }
+          this._applyCamera();
+        };
+        const uph = () => { drag = false; view.cursor = "grab"; };
+        const wheel = (e) => {
+          const d = e.deltaY || (e.nativeEvent && e.nativeEvent.deltaY) || 0;
+          this._r = S.clamp(this._r * (d > 0 ? 1.1 : 0.9), this._home.r * 0.25, this._home.r * 5);
+          this._applyCamera();
+          if (e.stopPropagation) e.stopPropagation();
+          if (e.preventDefault) e.preventDefault();
+        };
+        view.on("pointerdown", down);
+        view.on("globalpointermove", move);
+        view.on("pointerup", uph);
+        view.on("pointerupoutside", uph);
+        view.on("wheel", wheel);
+        this._ctl = { down, move, uph, wheel };
+      } else if (!on && this._ctl) {
+        const c = this._ctl;
+        view.off("pointerdown", c.down);
+        view.off("globalpointermove", c.move);
+        view.off("pointerup", c.uph);
+        view.off("pointerupoutside", c.uph);
+        view.off("wheel", c.wheel);
+        view.cursor = "default";
+        this._ctl = null;
+      }
     }
 
     _lights(THREE) {
@@ -201,6 +290,7 @@
 
     destroy() {
       this.disposed = true;
+      try { this.setControls(false); } catch (e) { /* view may be gone */ }
       Manager.active.delete(this);
       if (this.mixer) this.mixer.stopAllAction();
       if (this.texture) this.texture.destroy(true);

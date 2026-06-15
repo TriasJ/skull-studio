@@ -115,6 +115,11 @@ click a shape). They render live in 3D and you can tune clip/loop/auto-rotate/FO
 the inspector. On PPTX export they **bake to a picture** (PowerPoint only displays 3D
 it imported itself), while real imported models round-trip as live 3D.
 
+**Interactive camera:** turn on *interactive* in a model's inspector to **drag to
+orbit, scroll to zoom, shift-drag to pan** (and **Reset view** to recentre). It works
+in the editor and in the exported HTML viewer; it's off by default so normal slides
+still navigate on click. (3D in PPTX is a baked picture, so this is HTML-only.)
+
 Decks created with **Insert → 3D Models** import automatically — each model lands
 as a `model3d` element.
 

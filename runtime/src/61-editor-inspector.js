@@ -132,6 +132,8 @@
         }
         m3Rows.push(row("auto-rotate &deg;/s", num("m3-rot", m3.autoRotate ?? 0, 5)));
         m3Rows.push(row("camera FOV", num("m3-fov", (m3.camera && m3.camera.fov) ?? 45, 1)));
+        m3Rows.push(`<div class="row"><label title="drag to orbit, scroll to zoom, shift-drag to pan (in the editor and the exported HTML viewer)">interactive</label><input type="checkbox" id="m3-orbit" ${m3.orbit ? "checked" : ""}></div>`);
+        m3Rows.push(`<div class="row"><button id="m3-reset">Reset view</button></div>`);
         h.push(this.sec("model3d", "3D model", m3Rows));
       }
 
@@ -291,6 +293,14 @@
         m3.camera = Object.assign(m3.camera || {}, { fov });
         if (ev.model3d) ev.model3d.setFov(fov);
       });
+      const m3orbit = document.getElementById("m3-orbit");
+      if (m3orbit) m3orbit.onchange = (e) => {
+        m3.orbit = e.target.checked;
+        if (ev.model3d) ev.model3d.setControls(m3.orbit);
+        this.commitSoon(ev);
+      };
+      const m3reset = document.getElementById("m3-reset");
+      if (m3reset) m3reset.onclick = () => { if (ev.model3d) ev.model3d.resetView(); };
 
       for (const cb of this.el.querySelectorAll("input[data-idle]")) {
         cb.onchange = () => {

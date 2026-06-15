@@ -161,6 +161,16 @@ slide. Flow:
 - It captures the live render to a WebP via `POST /api/asset` → `work/crops/<id>.webp`.
   That crop is the **bake**.
 
+**Interactive camera (orbit/pan/zoom):** `Model3DView.setControls(on)` attaches
+Pixi federated pointer/wheel handlers to the model's sprite and drives a spherical
+camera (orbit), movable target (pan) and radius (zoom) around the framed centre;
+`resetView()` restores the framed "home". Gated per-model by `model3d.orbit` (off by
+default, toggled in the inspector) so it never steals slide-navigation clicks or box
+drags. Because the model renders to an offscreen canvas (not a DOM element),
+three.js's OrbitControls can't bind to it — hence the custom controller reading Pixi
+events and calling `_applyCamera()` + an immediate `_frame(0)` (so it responds even
+when the model is otherwise idle). Persists into the exported HTML viewer.
+
 **Export rule (the key decision):** `model3d` *with* `sourceXml` → real 3D
 round-trip (verbatim, animates in PowerPoint — confirmed). `model3d` *without*
 `sourceXml` (editor primitives, generated samples) → **baked to a picture** from the

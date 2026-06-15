@@ -9,6 +9,10 @@ loose [semantic versioning](https://semver.org/) while pre-1.0.
 - New **3D** menu in the editor: add a coloured **plane / cube / sphere / cylinder /
   cone / torus** to the current slide. Generated server-side as a glTF primitive,
   rendered live in three.js, tunable in the inspector (clip/loop/auto-rotate/FOV).
+- **Interactive camera (orbit / pan / zoom):** per-model *interactive* toggle — drag
+  to orbit, scroll to zoom, shift-drag to pan, plus **Reset view**. Works in the
+  editor and in the exported HTML viewer (the flag persists). Off by default so it
+  doesn't interfere with slide navigation or box editing.
 - **Export rule:** real imported 3D models (carry PowerPoint's own XML) round-trip as
   live, animated 3D; synthetic models (editor primitives, generated samples) **bake to
   a picture** on PPTX export — because PowerPoint only displays 3D it imported itself,
