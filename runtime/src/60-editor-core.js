@@ -9,6 +9,8 @@
       this.isOpen = false;
       this.selected = null;        // ElementView
       this.rigMode = false;        // bottom timeline panel open
+      this._undo = [];             // studio undo/redo: per-slide manifest snapshots
+      this._redo = [];
       this.dom = {
         rootEl: document.getElementById("skull-editor"),
         list: document.getElementById("ed-el-list"),
@@ -25,6 +27,13 @@
         if (ev.key.toLowerCase() === "e" && !this.isTyping(ev)) this.toggle();
         if (ev.key === "Escape" && this.isOpen) this.toggle();
         if (!this.isOpen || this.isTyping(ev)) return;
+        // undo / redo (studio): snapshot-based, current-slide scope
+        if (window.STUDIO && (ev.ctrlKey || ev.metaKey) && ev.key.toLowerCase() === "z") {
+          ev.preventDefault(); if (ev.shiftKey) this.redo(); else this.undo(); return;
+        }
+        if (window.STUDIO && (ev.ctrlKey || ev.metaKey) && ev.key.toLowerCase() === "y") {
+          ev.preventDefault(); this.redo(); return;
+        }
         // copy / paste an element (with its animations) across slides
         if ((ev.ctrlKey || ev.metaKey) && ev.key.toLowerCase() === "c" && this.selected) {
           this._clipboard = S.deepClone(this.selected.spec);
@@ -242,6 +251,7 @@
 
     /* clone the selected element with its animations/rig */
     duplicateElement(ev) {
+      this.pushUndo();
       const v = this.manager.currentView;
       const spec = S.deepClone(ev.spec);
       let n = 1, id;
@@ -272,6 +282,7 @@
     async addPrimitive(shape, color) {
       const v = this.manager.currentView;
       if (!v) return;
+      this.pushUndo();
       let res, data;
       try {
         res = await fetch("/api/add3d", { method: "POST", headers: { "content-type": "application/json" },
@@ -354,6 +365,7 @@
     pasteElement() {
       const v = this.manager.currentView;
       if (!v || !this._clipboard) return;
+      this.pushUndo();
       const spec = S.deepClone(this._clipboard);
       let n = 1, id;
       do { id = `${v.spec.id}_paste${n++}`; } while (v.spec.elements.some((e) => e.id === id));
@@ -374,6 +386,38 @@
         if (S.persist) S.persist.markDirty(id);
       });
     }
+
+    /* snapshot the current slide BEFORE a coarse edit (add/delete/paste/preset) */
+    pushUndo() {
+      if (!window.STUDIO) return;
+      const v = this.manager.currentView;
+      if (!v) return;
+      this._undo.push({ i: this.manager.current,
+        data: S.deepClone({ elements: v.spec.elements, background: v.spec.background }) });
+      if (this._undo.length > 30) this._undo.shift();
+      this._redo = [];
+    }
+
+    async _restore(from, to) {
+      if (!from.length) return;
+      const cur = this.manager.currentView;
+      to.push({ i: this.manager.current,
+        data: S.deepClone({ elements: cur.spec.elements, background: cur.spec.background }) });
+      const snap = from.pop();
+      if (snap.i !== this.manager.current) await this.manager.goto(snap.i, true);
+      const v = this.manager.views[snap.i];
+      v.spec.elements = S.deepClone(snap.data.elements);
+      v.spec.background = S.deepClone(snap.data.background);
+      await v.rebuildElements();
+      if (v.restartBgIdle) v.restartBgIdle();
+      this.selected = null;
+      this.setElementInteractivity(true);
+      this.rebuildList();
+      if (S.inspector) S.inspector.show(null);
+      if (S.persist) S.persist.markSlideDirty(v.spec.id);
+    }
+    undo() { this._restore(this._undo, this._redo); }
+    redo() { this._restore(this._redo, this._undo); }
 
     /* swap z with the nearest neighbour above (+1) / below (-1) */
     nudgeZ(ev, dir) {
@@ -499,6 +543,7 @@
     deleteElement(ev) {
       if (!window.STUDIO) return;
       if (!confirm(`Delete ${ev.spec.id}?`)) return;
+      this.pushUndo();
       const v = this.manager.currentView;
       const i = v.spec.elements.indexOf(ev.spec);
       if (i >= 0) v.spec.elements.splice(i, 1);

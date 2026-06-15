@@ -191,6 +191,39 @@
       this.built = true;
     }
 
+    /* tear down + rebuild the element + patch layers from the (possibly changed)
+       spec — used by editor undo/redo. Mirrors the element loop in _build(). */
+    async rebuildElements() {
+      if (!this.built) return;
+      for (const ev of this.elements) ev.destroy();
+      this.elements = [];
+      this.elementLayer.removeChildren();
+      for (const c of this.patchLayer.removeChildren()) c.destroy();
+      const deck = this.deck;
+      for (const el of this.spec.elements || []) {
+        if (el.cleanup === "fill" && el.fillColor) {
+          const b = S.bboxToDesign(el.cropBbox || el.bbox, deck);
+          const g = new PIXI.Graphics();
+          g.rect(b.x, b.y, b.w, b.h).fill(parseInt(el.fillColor.slice(1), 16));
+          this.patchLayer.addChild(g);
+        } else if (el.cleanup === "blur" && el.patch) {
+          const b = S.bboxToDesign(el.cropBbox || el.bbox, deck);
+          const tex = await S.assets.texture(el.patch);
+          const sp = new PIXI.Sprite(tex);
+          sp.position.set(b.x, b.y); sp.width = b.w; sp.height = b.h;
+          this.patchLayer.addChild(sp);
+        }
+        const ev = new ElementView(el, deck);
+        await ev.build();
+        this.elementLayer.addChild(ev.parallaxNode);
+        this.elements.push(ev);
+      }
+      this.buildTimeline();
+      this.timeline.progress(1);
+      for (const ev of this.elements) ev.startIdles();
+      S.parallax && S.parallax.setElements(this.elements);
+    }
+
     buildTimeline() {
       if (this.timeline) this.timeline.kill();
       const tl = gsap.timeline({ paused: true });

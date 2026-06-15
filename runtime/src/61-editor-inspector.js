@@ -301,6 +301,7 @@
 
       for (const btn of this.el.querySelectorAll(".ed-fx")) {
         btn.onclick = () => {
+          this.editor.pushUndo();
           S.EffectPresets.apply(spec, btn.dataset.fx);
           if (spec.type !== "model3d" && ev.view && ev.view.texture) ev.makeView(ev.view.texture, !!spec.rig);
           this.commit(ev);
@@ -340,6 +341,7 @@
 
       for (const cb of this.el.querySelectorAll("input[data-idle]")) {
         cb.onchange = () => {
+          this.editor.pushUndo();
           const name = cb.dataset.idle;
           spec.idle = spec.idle.filter((i) => i.type !== name);
           if (cb.checked) spec.idle.push({ type: name });

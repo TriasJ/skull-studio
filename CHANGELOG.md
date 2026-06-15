@@ -6,6 +6,9 @@ loose [semantic versioning](https://semver.org/) while pre-1.0.
 ## [Unreleased]
 
 ### Editor QoL
+- **Undo / redo** (Studio, **Ctrl+Z / Ctrl+Y**) — snapshot-based, per-slide; restores
+  add/delete/duplicate/paste/effect-preset/idle-toggle actions and rebuilds the slide
+  from spec.
 - **Arrow-key nudge** of the selected element box (Shift = bigger step; **Alt** snaps
   its centre to the slide centre on that axis).
 - **Effect presets** — one-click "looks" (Gentle float, Neon glow, Underwater, Drift
