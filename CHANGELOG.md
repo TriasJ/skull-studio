@@ -5,6 +5,16 @@ loose [semantic versioning](https://semver.org/) while pre-1.0.
 
 ## [Unreleased]
 
+### Lightweight OCR (no big download)
+- New **RapidOCR** import path — recovers text from rendered slides using the
+  already-bundled `rapidocr-onnxruntime` engine, so you can skip MinerU's ~GB model
+  download. Home page: **Import (RapidOCR)** / **Import PPTX (RapidOCR)**; CLI:
+  `python -m skull_studio.pipeline deck.pdf --ocr rapid`. New `extract_ocr.py` emits
+  the same manifest element shape as the MinerU draft (text blocks, reading order,
+  title/body heuristic). Trade-off: text only — no figure/table detection (draw image
+  regions by hand; PPTX picture shapes are still detected separately). Installer now
+  presents RapidOCR as the bundled default and MinerU as the optional heavy upgrade.
+
 ### 3D primitives in the editor
 - New **3D** menu in the editor: add a coloured **plane / cube / sphere / cylinder /
   cone / torus** to the current slide. Generated server-side as a glTF primitive,

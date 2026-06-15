@@ -78,9 +78,17 @@ PY = sys.executable
 TASKS = {
     "import": lambda pdf: [[PY, SCRIPTS / "pipeline.py", ROOT / pdf, "--no-build"]],
     "import-nomineru": lambda pdf: [[PY, SCRIPTS / "pipeline.py", ROOT / pdf, "--no-build", "--skip-mineru"]],
+    "import-rapid": lambda pdf: [[PY, SCRIPTS / "pipeline.py", ROOT / pdf, "--no-build", "--ocr", "rapid"]],
     "import-pptx": lambda pptx: [
         [PY, SCRIPTS / "extract_pptx.py", "render", ROOT / pptx],
         [PY, SCRIPTS / "extract_pptx.py", "mineru", ROOT / pptx],
+        [PY, SCRIPTS / "extract_pptx.py", "draft", ROOT / pptx],
+        [PY, SCRIPTS / "auto_choreo.py"],
+        [PY, SCRIPTS / "crop_and_patch.py"],
+        [PY, SCRIPTS / "debug_overlay.py"]],
+    "import-pptx-rapid": lambda pptx: [
+        [PY, SCRIPTS / "extract_pptx.py", "render", ROOT / pptx],
+        [PY, SCRIPTS / "extract_ocr.py", WORK / "pptx" / (Path(pptx).stem + ".pdf")],
         [PY, SCRIPTS / "extract_pptx.py", "draft", ROOT / pptx],
         [PY, SCRIPTS / "auto_choreo.py"],
         [PY, SCRIPTS / "crop_and_patch.py"],
@@ -264,10 +272,12 @@ section{margin:22px 0}</style></head><body>
 async function refresh(){
   const s = await (await fetch('/api/state')).json();
   document.getElementById('pdfs').innerHTML = s.pdfs.map(p =>
-    `<span class="pill">${p}</span> <button onclick="run('import','${p}')">Import</button>` +
-    `<button onclick="run('import-nomineru','${p}')">Import (no OCR)</button><br>`).join('') || '(no PDFs in project folder)';
+    `<span class="pill">${p}</span> <button onclick="run('import','${p}')" title="MinerU layout+OCR (~GB models)">Import</button>` +
+    `<button onclick="run('import-rapid','${p}')" title="RapidOCR: text only, bundled, no big download">Import (RapidOCR)</button>` +
+    `<button onclick="run('import-nomineru','${p}')" title="backgrounds only, add elements by hand">Import (no OCR)</button><br>`).join('') || '(no PDFs in project folder)';
   document.getElementById('pptxs').innerHTML = (s.pptxs||[]).map(p =>
-    `<span class="pill">${p}</span> <button onclick="run('import-pptx','${p}')">Import PPTX</button><br>`).join('');
+    `<span class="pill">${p}</span> <button onclick="run('import-pptx','${p}')" title="MinerU layout+OCR (~GB)">Import PPTX</button>` +
+    `<button onclick="run('import-pptx-rapid','${p}')" title="RapidOCR: text only, bundled, no big download">Import PPTX (RapidOCR)</button><br>`).join('');
   document.getElementById('state').textContent = s.manifest ? `${s.slides} slides, ${s.elements} elements` : 'no project yet - import a PDF';
   document.getElementById('dist').innerHTML = s.dist.map(d => `<span class="pill">${d}</span>`).join('');
   const st = await (await fetch('/api/status')).json();

@@ -27,6 +27,7 @@ sys.path.insert(0, str(SCRIPTS))
 
 import extract  # noqa: E402
 import extract_pptx  # noqa: E402
+import extract_ocr  # noqa: E402  (lightweight RapidOCR draft)
 
 
 def step(name):
@@ -62,12 +63,17 @@ def minimal_manifest(pdf: Path):
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("pdf", type=Path)
-    ap.add_argument("--skip-mineru", action="store_true")
+    ap.add_argument("--ocr", choices=("mineru", "rapid", "none"), default="mineru",
+                    help="text recovery: mineru (full layout, ~GB) | rapid (RapidOCR, "
+                         "bundled, text-only) | none (backgrounds only)")
+    ap.add_argument("--skip-mineru", action="store_true", help="alias for --ocr none")
     ap.add_argument("--no-choreo", action="store_true")
     ap.add_argument("--bg-quality", type=int, default=78)
     ap.add_argument("--no-build", action="store_true")
     ap.add_argument("--out", default="dist/presentation.html")
     a = ap.parse_args()
+    if a.skip_mineru:
+        a.ocr = "none"
     src = a.pdf.resolve()
     if not src.exists():
         sys.exit(f"not found: {src}")
@@ -77,10 +83,13 @@ def main():
     if is_pptx:
         step("1/7 render slides (LibreOffice + PyMuPDF)")
         extract_pptx.render(src)
-        if a.skip_mineru:
-            step("2/7 layout (skipped) + 3/7 shapes-only manifest")
+        pdf = WORK / "pptx" / (src.stem + ".pdf")
+        if a.ocr == "none":
+            step("2/7 OCR (skipped) + 3/7 shapes-only manifest")
             minimal_manifest(src)
-            extract_pptx.draft(src)  # still merges pptx shapes
+        elif a.ocr == "rapid":
+            step("2/7 RapidOCR (lightweight) + 3/7 text + shapes")
+            extract_ocr.draft(pdf)
         else:
             step("2/7 MinerU OCR on slides")
             try:
@@ -89,13 +98,16 @@ def main():
                 print(f"WARN MinerU failed ({e}); shapes-only")
                 minimal_manifest(src)
             step("3/7 merge OCR + shapes -> manifest")
-            extract_pptx.draft(src)
+        extract_pptx.draft(src)  # always merge real pptx shapes onto the manifest
     else:
         step("1/7 render pages")
         extract.render(src)
-        if a.skip_mineru:
-            step("2/7 layout (skipped) + 3/7 minimal manifest")
+        if a.ocr == "none":
+            step("2/7 OCR (skipped) + 3/7 minimal manifest")
             minimal_manifest(src)
+        elif a.ocr == "rapid":
+            step("2/7 RapidOCR (lightweight) + 3/7 draft manifest")
+            extract_ocr.draft(src)
         else:
             step("2/7 MinerU layout/OCR")
             try:

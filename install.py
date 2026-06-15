@@ -128,15 +128,20 @@ def main():
     fetch_libs()
     finalize_launchers()
 
+    print("\nOCR backends:")
+    print("  - RapidOCR is already bundled (no extra download) -> import with 'RapidOCR'")
+    print("    on the home page, or:  python -m skull_studio.pipeline deck.pdf --ocr rapid")
+    print("  - MinerU adds full layout analysis (figures/tables/reading order) but")
+    print("    downloads ~GB of models. Optional.")
     if not a.no_ocr:
         try:
-            ans = input("\nInstall MinerU OCR backend now? (recovers text from image-only decks; ~GB) [y/N] ")
+            ans = input("Install the heavier MinerU backend now? [y/N] ")
         except EOFError:
             ans = "n"
         if ans.strip().lower().startswith("y"):
             install_ocr()
         else:
-            print("  skipped - run later with:  uv tool install \"mineru[core]\"")
+            print("  skipped - RapidOCR works now; add MinerU later with:  uv tool install \"mineru[core]\"")
 
     print("\n=== Done ===")
     print("Launch the editor, any of:")

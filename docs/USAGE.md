@@ -6,9 +6,11 @@ A deck goes through these stages (run automatically on import, or by hand):
 
 1. **Render** — each slide → a 2× PNG (`work/slides/`). PDF via PyMuPDF; PPTX via
    LibreOffice (pptx → pdf → PNG).
-2. **Detect** — MinerU OCRs the rendered slides for text regions; for PPTX,
-   python-pptx adds exact shape geometry and any real text frames. Large pictures
-   (>60 % of a slide) become the background.
+2. **Detect** — OCR the rendered slides for text regions. Two engines:
+   **MinerU** (full layout: figures/tables/reading order; ~GB models) or the bundled
+   **RapidOCR** (text only, no download — `--ocr rapid`). For PPTX, python-pptx adds
+   exact shape geometry and any real text frames regardless. Large pictures (>60 % of
+   a slide) become the background.
 3. **Choreograph** — `auto_choreo.py` assigns sensible default entrances/idles
    (you refine these in the editor).
 4. **Crop & patch** — each element is cut from the render (`work/crops/`), and a
@@ -21,7 +23,8 @@ One-command headless run:
 
 ```bash
 python -m skull_studio.pipeline sample/demo.pdf
-# flags: --skip-mineru (backgrounds only), --no-choreo, --bg-quality N, --out PATH, --no-build
+# OCR engine: --ocr mineru (default, ~GB) | --ocr rapid (RapidOCR, bundled, text-only) | --ocr none
+# other flags: --skip-mineru (= --ocr none), --no-choreo, --bg-quality N, --out PATH, --no-build
 ```
 
 The result is `dist/presentation.html` (viewer) and `dist/editor.html` (editor).

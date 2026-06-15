@@ -108,7 +108,8 @@ to go from import → edit → export in a couple of minutes.
 | **Node.js ≥ 18** | ✅ yes | builds the HTML output (uses built-in `fetch`) | [nodejs.org](https://nodejs.org/) · `winget install OpenJS.NodeJS` · `brew install node` · `apt install nodejs` |
 | **ffmpeg** | ⬜ optional | bake idle/rig motion into mp4 / GIF | `winget install Gyan.FFmpeg` · `brew install ffmpeg` · `apt install ffmpeg` |
 | **LibreOffice** | ⬜ optional | render `.pptx` slides on import | `winget install TheDocumentFoundation.LibreOffice` · `brew install --cask libreoffice` · `apt install libreoffice` |
-| **MinerU** | ⬜ optional (heavy, ~GB) | OCR to recover text baked into slide images | `uv tool install "mineru[core]"` |
+| **RapidOCR** | ✅ bundled | lightweight OCR (text recovery), no extra download | included automatically |
+| **MinerU** | ⬜ optional (heavy, ~GB) | full layout OCR (figures/tables/reading order) | `uv tool install "mineru[core]"` |
 
 **Python packages** (installed automatically by `install.py` / `pip install -e .`):
 PyMuPDF, Pillow, NumPy, OpenCV, jsonschema, python-pptx, RapidOCR. The browser
