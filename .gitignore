@@ -22,3 +22,6 @@ uv.lock
 /*.pptx
 !sample/*.pdf
 !sample/*.pptx
+
+# generated Linux launcher (machine-specific paths)
+launchers/*.local.desktop

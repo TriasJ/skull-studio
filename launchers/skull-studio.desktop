@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Application
+Name=Skull Studio
+Comment=Turn PDF/PPTX decks into interactive animated HTML
+# Replace BOTH paths below with your repo location, then copy this file to
+#   ~/.local/share/applications/   (and `chmod +x` it). install.py can do this.
+Exec=python3 /ABSOLUTE/PATH/TO/skull-studio/launch.py
+Path=/ABSOLUTE/PATH/TO/skull-studio
+Terminal=true
+Categories=Graphics;Office;

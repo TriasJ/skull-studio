@@ -88,6 +88,11 @@ python install.py        # checks tools, installs the package, vendors PixiJS/GS
 skull-studio             # launches the editor in your browser
 ```
 
+**Prefer to double-click?** Use a wrapper in [`launchers/`](launchers/) —
+`Skull Studio.cmd` (Windows), `Skull Studio.command` (macOS), `skull-studio.sh`
+(Linux). They call the cross-platform `python launch.py`, which runs the app **in
+place without any install** (and fetches the browser libs on first run).
+
 On the **Studio home page** that opens, import the included **`sample/demo.pdf`**
 to go from import → edit → export in a couple of minutes.
 

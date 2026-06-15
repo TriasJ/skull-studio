@@ -80,6 +80,34 @@ def fetch_libs():
     ok("runtime libs vendored -> runtime/vendor/")
 
 
+def finalize_launchers():
+    """Make the double-click launchers usable on this OS."""
+    import os
+    import stat
+    print("\nSetting up launchers...")
+    if os.name == "nt":
+        ok("Windows: double-click  launchers\\Skull Studio.cmd")
+        return
+    scripts = [ROOT / "launch.py", ROOT / "launchers" / "Skull Studio.command",
+               ROOT / "launchers" / "skull-studio.sh"]
+    for f in scripts:
+        if f.exists():
+            f.chmod(f.stat().st_mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
+    if sys.platform == "darwin":
+        ok('macOS: double-click  "launchers/Skull Studio.command"')
+    else:  # Linux: emit a ready-to-use .desktop with absolute paths
+        tmpl = ROOT / "launchers" / "skull-studio.desktop"
+        if tmpl.exists():
+            text = (tmpl.read_text()
+                    .replace("python3 /ABSOLUTE/PATH/TO/skull-studio/launch.py", f"python3 {ROOT / 'launch.py'}")
+                    .replace("/ABSOLUTE/PATH/TO/skull-studio", str(ROOT)))
+            dest = ROOT / "launchers" / "skull-studio.local.desktop"
+            dest.write_text(text)
+            dest.chmod(dest.stat().st_mode | stat.S_IXUSR)
+            ok(f"Linux: run  launchers/skull-studio.sh  (or copy {dest.name}\n"
+               f"         to ~/.local/share/applications/ for an app-menu icon)")
+
+
 def install_ocr():
     print("\nInstalling MinerU OCR backend (optional, ~GB download)...")
     if have("uv"):
@@ -98,6 +126,7 @@ def main():
     check_prereqs()
     install_package()
     fetch_libs()
+    finalize_launchers()
 
     if not a.no_ocr:
         try:
@@ -110,8 +139,10 @@ def main():
             print("  skipped - run later with:  uv tool install \"mineru[core]\"")
 
     print("\n=== Done ===")
-    print("Launch the editor:")
-    print("    skull-studio            (or:  uv run skull-studio)")
+    print("Launch the editor, any of:")
+    print("    skull-studio                         (console command)")
+    print("    python launch.py                     (no install needed; --editor / --port N)")
+    print("    double-click a file in  launchers/   (Skull Studio.cmd / .command / .sh)")
     print("Then import sample/demo.pdf from the Studio home page to try it.")
 
 
