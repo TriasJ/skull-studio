@@ -211,12 +211,15 @@ def main(args):
             if el.get("hidden"):
                 continue
 
-            # Real imported 3D models (they carry PowerPoint's own XML) round-trip
-            # as live 3D. Synthetic models (editor primitives, generated samples —
-            # no sourceXml) fall through and bake to a picture from their crop,
-            # because PowerPoint won't display 3D it didn't import itself.
-            if (el["type"] == "model3d" and (el.get("model3d") or {}).get("sourceXml")
-                    and el.get("modelSrc") and (WORK / el["modelSrc"]).exists()):
+            # Real imported 3D models (they carry PowerPoint's own XML) round-trip as
+            # live 3D. Synthetic models (editor primitives, generated samples — no
+            # sourceXml) bake to a picture by default, because PowerPoint won't reliably
+            # display 3D it didn't import itself; pass --models 3d to embed them as real
+            # am3d 3D anyway (regenerated XML, with the preview as raster + picture fallback).
+            inject_3d = (el["type"] == "model3d" and el.get("modelSrc")
+                         and (WORK / el["modelSrc"]).exists()
+                         and ((el.get("model3d") or {}).get("sourceXml") or args.models == "3d"))
+            if inject_3d:
                 prev = (el.get("model3d") or {}).get("previewSrc")
                 preview = WORK / prev if prev and (WORK / prev).exists() else None
                 if preview is None and (WORK / el["crop"]).exists():
@@ -335,6 +338,9 @@ if __name__ == "__main__":
     ap.add_argument("--clips", choices=("none", "mp4", "gif"), default="none",
                     help="embed baked looping clips (from work/clips) for animated elements")
     ap.add_argument("--fps", type=int, default=18, help="(passed through; clips are pre-rendered)")
+    ap.add_argument("--models", choices=("picture", "3d"), default="picture",
+                    help="synthetic 3D models: bake a static picture (safe default) or embed "
+                         "real PowerPoint am3d 3D (regenerated; imported models always round-trip)")
     a = ap.parse_args()
     a.out = Path(a.out)
     if not a.out.is_absolute():

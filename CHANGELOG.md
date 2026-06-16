@@ -15,10 +15,18 @@ loose [semantic versioning](https://semver.org/) while pre-1.0.
   3. **Particles** — sparkle / snow / embers / floatUp / bubbles, each a different shape.
   4. **3D models** — sphere / cone / torus (baked tumble) + cube / cylinder / plane
      (auto-rotate), live in three.js.
-- One-click **Load feature showcase** button on the Studio home page (`showcase` task:
-  generate GLBs → build the deck → build HTML). Builds to `dist/showcase.html` (live);
-  `export_pptx --clips mp4 --animate` produces `dist/showcase.pptx` with idle/particle
-  effects embedded as looping videos, entrances as Fade, and 3D baked to pictures.
+- One-click **Load feature showcase** and **Bake showcase PPTX** buttons on the Studio
+  home page (`showcase` / `showcase-pptx` tasks). Builds to `dist/showcase.html` (live);
+  the PPTX bake embeds idle/particle effects as looping videos, entrances as Fade, and
+  **real am3d 3D models**.
+- **`export_pptx --models {picture,3d}`** — synthetic 3D models (editor primitives /
+  generated samples, no PowerPoint `sourceXml`) can now be embedded as **real am3d 3D**
+  (`--models 3d`), not just baked to a picture (`picture`, still the default). Uses the
+  existing regenerated-am3d path, with the preview as the `am3d:raster` and a picture
+  `mc:Fallback`, so it degrades gracefully on clients without 3D support.
+- Showcase crop tiles are drawn at each element's **exact bbox pixel size** (fixes baked
+  idle/particle videos overflowing/clipping their frame in PPTX), and the six 3D
+  primitives get recognizable line-art previews.
 
 ### Editor QoL
 - **Undo / redo** (Studio, **Ctrl+Z / Ctrl+Y**) — snapshot-based, per-slide; restores

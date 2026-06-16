@@ -130,6 +130,10 @@ TASKS = {
                                 [PY, SCRIPTS / "make_showcase.py"],
                                 [PY, SCRIPTS / "validate_manifest.py"],
                                 ["node", SCRIPTS / "build.mjs"]],
+    # bake the showcase to PowerPoint: looping clips for idles/particles + real am3d 3D
+    "showcase-pptx": lambda _=None: [[PY, SCRIPTS / "render_clips.py", "--format", "mp4", "--max-dim", "600"],
+                                     [PY, SCRIPTS / "export_pptx.py", "dist/showcase.pptx",
+                                      "--format", "jpg", "--clips", "mp4", "--animate", "--models", "3d"]],
 }
 
 def _browse(raw, exts):
@@ -272,6 +276,7 @@ section{margin:22px 0}</style></head><body>
 <button onclick="run('import-file', document.getElementById('imppath').value)">Import file</button></div>
 <div style="margin-top:8px">or just explore:
 <button onclick="run('showcase')" title="generate the feature-showcase deck (entrances, idle loops, particles, 3D models) into work/ and build it">Load feature showcase</button>
+<button onclick="run('showcase-pptx')" title="bake the showcase to dist/showcase.pptx: looping videos for idles/particles + real am3d 3D models (close the file in PowerPoint first)">Bake showcase PPTX</button>
 <span style="color:#888">&mdash; entrances, idle loops, particles &amp; 3D, then open the editor or Build</span></div></section>
 <section><b>2 &middot; Edit</b> &mdash; <a href="/editor" target="_blank">open the editor</a>
 <span class="pill" id="state">checking&hellip;</span></section>

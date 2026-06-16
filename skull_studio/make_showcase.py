@@ -7,6 +7,10 @@ a fully-wired manifest), then `build.mjs` turns it into dist/showcase.html:
     python -m skull_studio.make_showcase           # work/manifest.json + assets
     node skull_studio/build.mjs                     # dist/presentation.html (live)
 
+For a PowerPoint with looping effect videos + real 3D models:
+    python -m skull_studio.render_clips --format mp4 --max-dim 600
+    python -m skull_studio.export_pptx dist/showcase.pptx --format jpg --clips mp4 --animate --models 3d
+
 Four slides:
   1. Entrances   — every entrance type, staggered (fade family, scale, mask, blur,
                    drawOn, staggerText, rotateIn, scaleIn3D)
