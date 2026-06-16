@@ -5,6 +5,21 @@ loose [semantic versioning](https://semver.org/) while pre-1.0.
 
 ## [Unreleased]
 
+### Feature-showcase deck
+- New `make_showcase.py` generates a 4-slide deck that demonstrates **everything the
+  runtime can do**, ready to build/edit/export:
+  1. **Entrances** — every type, staggered (fade family, scaleIn, maskReveal, blurIn,
+     drawOn, staggerText, rotateIn, scaleIn3D).
+  2. **Idle loops** — float / breath / pulse / sway / shimmer + the mesh effects
+     wave / meshWave / ripple / swirl + glow.
+  3. **Particles** — sparkle / snow / embers / floatUp / bubbles, each a different shape.
+  4. **3D models** — sphere / cone / torus (baked tumble) + cube / cylinder / plane
+     (auto-rotate), live in three.js.
+- One-click **Load feature showcase** button on the Studio home page (`showcase` task:
+  generate GLBs → build the deck → build HTML). Builds to `dist/showcase.html` (live);
+  `export_pptx --clips mp4 --animate` produces `dist/showcase.pptx` with idle/particle
+  effects embedded as looping videos, entrances as Fade, and 3D baked to pictures.
+
 ### Editor QoL
 - **Undo / redo** (Studio, **Ctrl+Z / Ctrl+Y**) — snapshot-based, per-slide; restores
   add/delete/duplicate/paste/effect-preset/idle-toggle actions and rebuilds the slide

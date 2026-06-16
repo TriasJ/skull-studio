@@ -94,7 +94,10 @@ skull-studio             # launches the editor in your browser
 place without any install** (and fetches the browser libs on first run).
 
 On the **Studio home page** that opens, import the included **`sample/demo.pdf`**
-to go from import → edit → export in a couple of minutes.
+to go from import → edit → export in a couple of minutes. Or click **Load feature
+showcase** to drop in a ready-made deck demonstrating every animation — entrances,
+idle loops, particles and live 3D models — then open the editor or **Build** it to
+`dist/showcase.html`.
 
 > Prefer [uv](https://docs.astral.sh/uv/)? `uv run install.py` and
 > `uv run skull-studio` work too, and `uv` makes the optional MinerU install
@@ -263,6 +266,7 @@ skull_studio/      Python pipeline + Node build scripts + the local server
   render_clips.py    bake idle/rig motion to mp4/GIF (numpy + OpenCV + ffmpeg)
   build*.mjs         HTML / baked-HTML builders (Node)
   make_sample.py     generate sample/demo.pdf
+  make_showcase.py   generate the feature-showcase deck (all animations + 3D)
 runtime/
   src/*.js           editor + player runtime (plain modules, 00–66)
   template.html      HTML shell; vendor/  vendored PixiJS + GSAP (fetched)

@@ -125,6 +125,11 @@ TASKS = {
     # viewer-only build for the editor's Preview button (fastest path)
     "preview": lambda _=None: [[PY, SCRIPTS / "validate_manifest.py"],
                                ["node", SCRIPTS / "build.mjs"]],
+    # regenerate the feature-showcase deck (entrances / idles / particles / 3D) into work/
+    "showcase": lambda _=None: [["node", SCRIPTS / "make_sample_glb.mjs"],
+                                [PY, SCRIPTS / "make_showcase.py"],
+                                [PY, SCRIPTS / "validate_manifest.py"],
+                                ["node", SCRIPTS / "build.mjs"]],
 }
 
 def _browse(raw, exts):
@@ -264,7 +269,10 @@ section{margin:22px 0}</style></head><body>
 <span id="pdfs"></span><span id="pptxs"></span>
 <div style="margin-top:8px">or a file anywhere:
 <input id="imppath" placeholder="full path to a .pdf or .pptx (e.g. sample/demo.pdf)" style="width:46%;background:#101014;color:#ddd;border:1px solid #333;border-radius:5px;padding:5px">
-<button onclick="run('import-file', document.getElementById('imppath').value)">Import file</button></div></section>
+<button onclick="run('import-file', document.getElementById('imppath').value)">Import file</button></div>
+<div style="margin-top:8px">or just explore:
+<button onclick="run('showcase')" title="generate the feature-showcase deck (entrances, idle loops, particles, 3D models) into work/ and build it">Load feature showcase</button>
+<span style="color:#888">&mdash; entrances, idle loops, particles &amp; 3D, then open the editor or Build</span></div></section>
 <section><b>2 &middot; Edit</b> &mdash; <a href="/editor" target="_blank">open the editor</a>
 <span class="pill" id="state">checking&hellip;</span></section>
 <section><b>3 &middot; Export</b>
