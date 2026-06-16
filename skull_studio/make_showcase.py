@@ -69,32 +69,102 @@ def background(idx, title, subtitle):
     img.save(WORK / "slides_webp" / f"slide_{idx:02d}.webp", "WEBP", quality=84)
 
 
-def tile(name, label, accent, pattern="shape", w=420, h=300):
-    """A labelled rounded-card crop tile. `pattern` decides the inner motif so the
-    effect reads well (e.g. a grid warps visibly under the mesh idles)."""
+def _px(bbox, lo=120):
+    """Tile pixel size MUST equal the element's bbox in background pixels — render_clips
+    composites the crop at its native resolution, so any mismatch overflows/clips the
+    baked video. (Also avoids stretch in the live HTML, where the sprite fills the box.)"""
+    return max(lo, round((bbox[2] - bbox[0]) * W)), max(lo, round((bbox[3] - bbox[1]) * H))
+
+
+def _card(d, w, h, accent):
+    pad = max(5, round(min(w, h) * 0.035))
+    rad = max(10, round(min(w, h) * 0.09))
+    d.rounded_rectangle([pad, pad, w - pad, h - pad], radius=rad,
+                        fill=(22, 22, 30, 255), outline=accent + (255,),
+                        width=max(2, round(min(w, h) * 0.013)))
+    return pad
+
+
+def _label(d, w, h, label, accent):
+    _centered(d, w / 2, h * 0.82, label, _font(max(12, round(min(w, h) * 0.13)), bold=True),
+              (232, 232, 238))
+
+
+def tile(name, label, accent, pattern, bbox):
+    """A labelled rounded-card crop tile sized to its bbox. `pattern` picks the inner
+    motif so the effect reads well (a grid warps visibly under the mesh idles)."""
+    w, h = _px(bbox)
     img = Image.new("RGBA", (w, h), (0, 0, 0, 0))
     d = ImageDraw.Draw(img)
-    pad = 8
-    d.rounded_rectangle([pad, pad, w - pad, h - pad], radius=20,
-                        fill=(22, 22, 30, 255), outline=accent + (255,), width=3)
-    cx, cy = w / 2, h / 2 - 6
+    pad = _card(d, w, h, accent)
+    cx, cy, R = w / 2, h * 0.42, min(w, h) * 0.24
+    lw = max(2, round(R * 0.09))
     if pattern == "grid":                               # mesh effects (wave/ripple/swirl)
+        x0, y0, x1, y1 = pad + lw, pad + lw, w - pad - lw, h * 0.66
         for gx in range(1, 9):
-            x = pad + gx * (w - 2 * pad) / 9
-            d.line([(x, pad + 12), (x, h - pad - 12)], fill=accent + (110,), width=2)
+            x = x0 + gx * (x1 - x0) / 9
+            d.line([(x, y0), (x, y1)], fill=accent + (120,), width=max(1, lw - 1))
         for gy in range(1, 7):
-            y = pad + gy * (h - 2 * pad) / 7
-            d.line([(pad + 12, y), (w - pad - 12, y)], fill=accent + (110,), width=2)
-    elif pattern == "glow":                             # glow effect — a bright disc
-        r = 64
-        d.ellipse([cx - r, cy - r, cx + r, cy + r], fill=accent + (255,))
+            y = y0 + gy * (y1 - y0) / 7
+            d.line([(x0, y), (x1, y)], fill=accent + (120,), width=max(1, lw - 1))
+    elif pattern == "glow":                             # glow / pulse — a bright disc
+        d.ellipse([cx - R, cy - R, cx + R, cy + R], fill=accent + (255,))
     elif pattern == "rings":
-        for r in (30, 54, 78):
-            d.ellipse([cx - r, cy - r, cx + r, cy + r], outline=accent + (220,), width=4)
+        for k in (0.5, 0.75, 1.0):
+            r = R * k
+            d.ellipse([cx - r, cy - r, cx + r, cy + r], outline=accent + (220,), width=lw)
     else:                                               # default: a filled diamond glyph
-        r = 56
-        d.polygon([(cx, cy - r), (cx + r, cy), (cx, cy + r), (cx - r, cy)], fill=accent + (235,))
-    _centered(d, cx, h - 46, label, _font(26, bold=True), (232, 232, 238))
+        d.polygon([(cx, cy - R), (cx + R, cy), (cx, cy + R), (cx - R, cy)], fill=accent + (235,))
+    _label(d, w, h, label, accent)
+    (WORK / "crops").mkdir(parents=True, exist_ok=True)
+    img.save(WORK / "crops" / f"{name}.webp", "WEBP", quality=90)
+    return f"crops/{name}.webp"
+
+
+def model_tile(name, label, accent, kind, bbox):
+    """3D-preview tile: recognizable line-art of the primitive (this is what PowerPoint
+    bakes as the static picture for our synthetic models, since it can't show live 3D)."""
+    w, h = _px(bbox)
+    img = Image.new("RGBA", (w, h), (0, 0, 0, 0))
+    d = ImageDraw.Draw(img)
+    pad = _card(d, w, h, accent)
+    cx, cy, R = w / 2, h * 0.42, min(w, h) * 0.28
+    col = accent + (255,)
+    lw = max(2, round(R * 0.07))
+    thin = max(1, lw - 1)
+    if kind == "sphere":
+        d.ellipse([cx - R, cy - R, cx + R, cy + R], outline=col, width=lw)
+        d.ellipse([cx - R, cy - R * 0.34, cx + R, cy + R * 0.34], outline=col, width=thin)
+        d.ellipse([cx - R * 0.38, cy - R, cx + R * 0.38, cy + R], outline=col, width=thin)
+    elif kind == "cone":
+        d.line([(cx, cy - R), (cx - R * 0.85, cy + R)], fill=col, width=lw)
+        d.line([(cx, cy - R), (cx + R * 0.85, cy + R)], fill=col, width=lw)
+        d.ellipse([cx - R * 0.85, cy + R - R * 0.24, cx + R * 0.85, cy + R + R * 0.24], outline=col, width=lw)
+    elif kind == "torus":
+        d.ellipse([cx - R, cy - R * 0.62, cx + R, cy + R * 0.62], outline=col, width=lw)
+        d.ellipse([cx - R * 0.42, cy - R * 0.26, cx + R * 0.42, cy + R * 0.26], outline=col, width=lw)
+    elif kind == "cube":                                # wireframe box (front + offset back)
+        s, dx, dy = R * 1.1, R * 0.5, R * 0.5
+        fx0, fy0 = cx - s * 0.62, cy - s * 0.3
+        front = [(fx0, fy0), (fx0 + s, fy0), (fx0 + s, fy0 + s), (fx0, fy0 + s)]
+        back = [(x + dx, y - dy) for x, y in front]
+        d.polygon(front, outline=col, width=lw)
+        d.polygon(back, outline=col, width=thin)
+        for (a, b) in zip(front, back):
+            d.line([a, b], fill=col, width=thin)
+    elif kind == "cylinder":
+        rx, ry, top, bot = R * 0.7, R * 0.22, cy - R * 0.7, cy + R * 0.7
+        d.line([(cx - rx, top), (cx - rx, bot)], fill=col, width=lw)
+        d.line([(cx + rx, top), (cx + rx, bot)], fill=col, width=lw)
+        d.ellipse([cx - rx, bot - ry, cx + rx, bot + ry], outline=col, width=lw)
+        d.ellipse([cx - rx, top - ry, cx + rx, top + ry], outline=col, width=lw)
+    else:                                               # plane — a tilted parallelogram
+        p = [(cx - R, cy + R * 0.45), (cx - R * 0.25, cy - R * 0.5),
+             (cx + R, cy - R * 0.45), (cx + R * 0.25, cy + R * 0.5)]
+        d.polygon(p, outline=col, width=lw)
+        d.line([((p[0][0] + p[1][0]) / 2, (p[0][1] + p[1][1]) / 2),
+                ((p[2][0] + p[3][0]) / 2, (p[2][1] + p[3][1]) / 2)], fill=col, width=thin)
+    _label(d, w, h, label, accent)
     (WORK / "crops").mkdir(parents=True, exist_ok=True)
     img.save(WORK / "crops" / f"{name}.webp", "WEBP", quality=90)
     return f"crops/{name}.webp"
@@ -141,7 +211,7 @@ def slide_entrances():
     els = []
     for i, ((etype, label), bbox) in enumerate(zip(demos, boxes)):
         accent = PALETTE[i % len(PALETTE)]
-        crop = tile(f"ent_{etype}", label, accent, "shape")
+        crop = tile(f"ent_{etype}", label, accent, "shape", bbox)
         els.append(el(f"ent_{etype}", bbox, crop, entrance={
             "type": etype, "delay": 0.25 + i * 0.22, "duration": 0.8, "ease": "power3.out",
         }))
@@ -168,7 +238,7 @@ def slide_idles():
         accent = PALETTE[i % len(PALETTE)]
         if itype == "glow":
             params = {**params, "color": "#%02x%02x%02x" % accent}
-        crop = tile(f"idle_{itype}", label, accent, pat)
+        crop = tile(f"idle_{itype}", label, accent, pat, bbox)
         els.append(el(f"idle_{itype}", bbox, crop,
                       entrance={"type": "scaleIn", "delay": 0.1 + i * 0.05, "duration": 0.6, "ease": "back.out(1.3)"},
                       idle=[{"type": itype, **params}]))
@@ -188,7 +258,7 @@ def slide_particles():
     els = []
     for i, ((preset, label, shape, color), bbox) in enumerate(zip(demos, boxes)):
         accent = PALETTE[i % len(PALETTE)]
-        crop = tile(f"par_{preset}", label, accent, "shape", w=300, h=380)
+        crop = tile(f"par_{preset}", label, accent, "shape", bbox)
         els.append(el(f"par_{preset}", bbox, crop,
                       entrance={"type": "fadeIn", "delay": 0.1 + i * 0.08, "duration": 0.7},
                       idle=[{"type": "particles", "preset": preset, "shape": shape, "size": 1.1, "color": color}]))
@@ -197,7 +267,7 @@ def slide_particles():
 
 
 def _model_el(eid, kind, bbox, *, clip=None, dur_ms=0, auto=0, color=(120, 180, 240)):
-    crop = tile(eid, kind.capitalize(), color, "rings", w=360, h=400)
+    crop = model_tile(eid, kind.capitalize(), color, kind, bbox)
     m3d = {"clip": clip, "loop": True, "durationMs": dur_ms, "autoRotate": auto,
            "camera": {"fov": 45}, "transform": {"rot": [0.35, 0.6, 0], "scale": [1, 1, 1]},
            "previewSrc": None, "sourceXml": None}
