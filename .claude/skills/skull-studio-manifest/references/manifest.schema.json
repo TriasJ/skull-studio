@@ -1,0 +1,336 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/TriasJ/skull-studio/manifest.schema.json",
+  "title": "Skull Studio manifest",
+  "description": "Machine-readable mirror of skull_studio/validate_manifest.py. Structural rules only - the validator additionally checks that referenced crops, patches, backgrounds and .glb files exist on disk, which a schema cannot express. Run `python -m skull_studio.validate_manifest` as the authority.",
+  "type": "object",
+  "required": ["version", "meta", "deck", "slides"],
+  "additionalProperties": true,
+  "properties": {
+    "version": { "type": "string", "const": "1.0" },
+    "meta": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "title": { "type": "string" },
+        "docId": {
+          "type": "string",
+          "description": "deck-<sha1[:8]>. Gates build.mjs --apply overrides.json; never hand-edit."
+        },
+        "sourcePdf": { "type": "string" },
+        "sourcePptx": { "type": "string" }
+      }
+    },
+    "deck": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "designWidth": { "type": "number", "exclusiveMinimum": 0, "description": "PDF points" },
+        "designHeight": { "type": "number", "exclusiveMinimum": 0 },
+        "pixelScale": { "type": "number", "exclusiveMinimum": 0, "default": 2 },
+        "background": { "$ref": "#/$defs/hexColor" },
+        "transition": {
+          "type": "object",
+          "additionalProperties": true,
+          "properties": {
+            "type": { "type": "string" },
+            "duration": { "type": "number", "minimum": 0 },
+            "ease": { "$ref": "#/$defs/ease" }
+          }
+        },
+        "navigation": {
+          "type": "object",
+          "additionalProperties": true,
+          "properties": {
+            "keyboard": { "type": "boolean" },
+            "click": { "type": "boolean" }
+          }
+        },
+        "buildOptions": {
+          "type": "object",
+          "additionalProperties": true,
+          "properties": {
+            "bgQuality": { "type": "integer", "minimum": 1, "maximum": 100, "default": 78 },
+            "bgScale": { "type": "number", "exclusiveMinimum": 0, "default": 1.0 }
+          }
+        }
+      }
+    },
+    "slides": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/slide" }
+    }
+  },
+
+  "$defs": {
+    "hexColor": { "type": "string", "pattern": "^#[0-9a-fA-F]{6}$" },
+
+    "bbox": {
+      "description": "Normalized [x0,y0,x1,y1], top-left origin, y down. Must be non-degenerate; the schema cannot express x1>x0, the validator checks it.",
+      "type": "array",
+      "minItems": 4,
+      "maxItems": 4,
+      "items": { "type": "number", "minimum": 0, "maximum": 1 }
+    },
+
+    "ease": {
+      "description": "Outside this set the runtime silently falls back to power2.out (runtime/src/00-core.js:6-15).",
+      "type": "string",
+      "enum": [
+        "none",
+        "power1.in", "power1.out", "power1.inOut",
+        "power2.in", "power2.out", "power2.inOut",
+        "power3.in", "power3.out", "power3.inOut",
+        "power4.in", "power4.out", "power4.inOut",
+        "sine.in", "sine.out", "sine.inOut",
+        "expo.in", "expo.out", "expo.inOut",
+        "back.out", "back.out(1.4)", "back.out(1.7)", "back.inOut",
+        "elastic.out", "elastic.out(1,0.4)",
+        "circ.out", "circ.inOut"
+      ]
+    },
+
+    "entrance": {
+      "type": ["object", "null"],
+      "required": ["type"],
+      "additionalProperties": true,
+      "properties": {
+        "type": {
+          "type": "string",
+          "enum": ["fadeIn", "fadeUp", "fadeDown", "fadeLeft", "fadeRight", "scaleIn",
+                   "maskReveal", "blurIn", "drawOn", "staggerText", "none",
+                   "rotateIn", "scaleIn3D"]
+        },
+        "delay": { "type": "number", "minimum": 0 },
+        "duration": { "type": "number", "minimum": 0 },
+        "ease": { "$ref": "#/$defs/ease" },
+        "distance": { "type": "number", "description": "fadeUp/Down/Left/Right travel, fraction of designHeight" },
+        "direction": { "type": "string", "enum": ["left", "right", "up", "down", "center"] },
+        "from": { "type": "number", "description": "scaleIn start scale" },
+        "fromBlur": { "type": "number", "description": "blurIn start blur in px" },
+        "turns": { "type": "number", "description": "rotateIn spin turns" }
+      }
+    },
+
+    "idle": {
+      "type": ["object", "null"],
+      "required": ["type"],
+      "additionalProperties": true,
+      "properties": {
+        "type": {
+          "type": "string",
+          "enum": ["float", "pulse", "sway", "shimmer", "breath", "meshWave", "kenBurns",
+                   "none", "autoRotate", "wave", "ripple", "swirl", "glow", "particles"]
+        },
+        "amount": { "type": "number" },
+        "amplitude": { "type": "number" },
+        "period": { "type": "number", "exclusiveMinimum": 0 },
+        "speed": { "type": "number" },
+        "degrees": { "type": "number" },
+        "waves": { "type": "number" },
+        "radius": { "type": "number" },
+        "axis": { "type": "string", "enum": ["x", "y"] },
+        "color": { "$ref": "#/$defs/hexColor" },
+        "scale": { "type": "number", "description": "kenBurns zoom target" },
+        "duration": { "type": "number", "description": "kenBurns cycle length" },
+        "yoyo": { "type": "boolean" },
+        "preset": { "type": "string", "enum": ["sparkle", "snow", "embers", "floatUp", "bubbles"] },
+        "shape": { "type": "string", "enum": ["dot", "circle", "ring", "square", "triangle", "star", "custom"] },
+        "rate": { "type": "number", "description": "particles per second" },
+        "size": { "type": "number", "description": "particle size MULTIPLIER, default 1" },
+        "texture": { "type": "string", "description": "particles/<file>.png, required for shape=custom" }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "shape": { "const": "custom" } }, "required": ["shape"] },
+          "then": { "required": ["texture"] }
+        }
+      ]
+    },
+
+    "bone": {
+      "type": "object",
+      "required": ["id", "x", "y"],
+      "additionalProperties": true,
+      "properties": {
+        "id": { "type": "string" },
+        "parent": { "type": ["string", "null"] },
+        "x": { "type": "number" },
+        "y": { "type": "number" },
+        "angle": { "type": "number", "description": "degrees" },
+        "length": { "type": "number", "description": "0 for a pin" }
+      }
+    },
+
+    "rig": {
+      "type": ["object", "null"],
+      "additionalProperties": true,
+      "properties": {
+        "mesh": {
+          "type": "object",
+          "additionalProperties": true,
+          "properties": {
+            "verticesX": { "type": "integer", "minimum": 2 },
+            "verticesY": { "type": "integer", "minimum": 2 }
+          }
+        },
+        "bones": { "type": "array", "items": { "$ref": "#/$defs/bone" } },
+        "weights": {
+          "type": "object",
+          "additionalProperties": true,
+          "properties": {
+            "mode": { "type": "string", "enum": ["auto"] },
+            "falloff": { "type": "number" },
+            "maxInfluences": { "type": "integer", "minimum": 1 }
+          }
+        },
+        "anim": {
+          "type": "object",
+          "additionalProperties": true,
+          "properties": {
+            "duration": { "type": "number", "exclusiveMinimum": 0 },
+            "loop": { "type": "boolean" },
+            "ease": { "$ref": "#/$defs/ease" },
+            "tracks": {
+              "type": "object",
+              "description": "boneId -> keyframes holding ABSOLUTE poses",
+              "additionalProperties": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "required": ["t"],
+                  "additionalProperties": true,
+                  "properties": {
+                    "t": { "type": "number", "minimum": 0 },
+                    "x": { "type": "number" },
+                    "y": { "type": "number" },
+                    "angle": { "type": "number" }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+
+    "model3d": {
+      "type": ["object", "null"],
+      "additionalProperties": true,
+      "properties": {
+        "clip": { "type": ["integer", "null"], "description": "baked glTF animation index" },
+        "loop": { "type": "boolean" },
+        "durationMs": { "type": ["number", "null"] },
+        "autoRotate": { "type": "number", "description": "degrees per second" },
+        "camera": {
+          "type": ["object", "null"],
+          "additionalProperties": true,
+          "properties": { "fov": { "type": "number" } }
+        },
+        "transform": {
+          "type": ["object", "null"],
+          "additionalProperties": true,
+          "properties": {
+            "rot": { "type": "array", "minItems": 3, "maxItems": 3, "items": { "type": "number" },
+                     "description": "radians" },
+            "scale": { "type": "array", "minItems": 3, "maxItems": 3, "items": { "type": "number" } }
+          }
+        },
+        "orbit": { "type": "boolean", "description": "interactive camera in HTML" },
+        "previewSrc": { "type": ["string", "null"] },
+        "sourceXml": {
+          "type": ["string", "null"],
+          "description": "verbatim am3d OOXML from a PowerPoint import. Present = round-trips as live 3D; absent = baked to a picture unless export_pptx --models 3d."
+        },
+        "sourceSpid": { "type": ["integer", "string", "null"] }
+      }
+    },
+
+    "element": {
+      "type": "object",
+      "required": ["id", "type", "bbox"],
+      "additionalProperties": true,
+      "properties": {
+        "id": { "type": "string", "description": "unique deck-wide" },
+        "name": { "type": "string" },
+        "type": { "type": "string", "enum": ["text", "image", "shape", "model3d"] },
+        "role": { "type": "string", "enum": ["title", "body", "figure"] },
+        "text": { "type": "string" },
+        "bbox": { "$ref": "#/$defs/bbox" },
+        "cropBbox": {
+          "type": ["array", "null"], "minItems": 4, "maxItems": 4,
+          "items": { "type": "number", "minimum": 0, "maximum": 1 }
+        },
+        "crop": { "type": ["string", "null"] },
+        "polygon": {
+          "type": ["array", "null"],
+          "items": { "type": "array", "minItems": 2, "maxItems": 2, "items": { "type": "number" } }
+        },
+        "regions": {
+          "type": ["array", "null"],
+          "items": {
+            "type": "object",
+            "required": ["op", "pts"],
+            "additionalProperties": true,
+            "properties": {
+              "op": { "type": "string", "enum": ["add", "sub"] },
+              "pts": {
+                "type": "array",
+                "items": { "type": "array", "minItems": 2, "maxItems": 2, "items": { "type": "number" } }
+              }
+            }
+          }
+        },
+        "z": { "type": "integer" },
+        "cleanup": { "type": "string", "enum": ["none", "fill", "blur", "auto"] },
+        "fillColor": { "type": ["string", "null"], "pattern": "^#[0-9a-fA-F]{6}$" },
+        "patch": { "type": ["string", "null"] },
+        "blurRadius": { "type": "number", "minimum": 0 },
+        "hidden": { "type": "boolean" },
+        "blendMode": {
+          "type": ["string", "null"],
+          "enum": ["normal", "add", "screen", "multiply", "overlay", "darken", "lighten",
+                   "color-dodge", "color-burn", "hard-light", "soft-light", "difference",
+                   "exclusion", null]
+        },
+        "opacity": { "type": "number", "minimum": 0, "maximum": 1 },
+        "parallax": { "type": "number", "minimum": 0, "maximum": 1 },
+        "entrance": { "$ref": "#/$defs/entrance" },
+        "idle": { "type": ["array", "null"], "items": { "$ref": "#/$defs/idle" } },
+        "rig": { "$ref": "#/$defs/rig" },
+        "lines": { "description": "reserved; never populated or read" },
+        "modelSrc": { "type": ["string", "null"] },
+        "model3d": { "$ref": "#/$defs/model3d" }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "cleanup": { "const": "fill" } }, "required": ["cleanup"] },
+          "then": {
+            "properties": { "fillColor": { "$ref": "#/$defs/hexColor" } },
+            "required": ["fillColor"]
+          }
+        }
+      ]
+    },
+
+    "slide": {
+      "type": "object",
+      "required": ["id", "elements"],
+      "additionalProperties": true,
+      "properties": {
+        "id": { "type": "string" },
+        "index": { "type": "integer", "minimum": 0 },
+        "background": {
+          "type": "object",
+          "additionalProperties": true,
+          "properties": {
+            "src": { "type": "string" },
+            "idle": { "$ref": "#/$defs/idle" }
+          }
+        },
+        "model3dTiming": { "type": ["string", "null"], "description": "raw OOXML, replayed on export" },
+        "elements": { "type": "array", "items": { "$ref": "#/$defs/element" } }
+      }
+    }
+  }
+}

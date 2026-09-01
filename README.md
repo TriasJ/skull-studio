@@ -7,7 +7,8 @@ browser-based editor, mesh & 2D-bone rigging (Rive-style, but free for commercia
 use), and export back to PowerPoint or self-contained video/GIF slideshows.
 
 [Quick start](#-quick-start) · [Features](#-feature-tour) · [Exports](#-export-formats) ·
-[Usage guide](docs/USAGE.md) · [Architecture](docs/ARCHITECTURE.md) · [Troubleshooting](docs/TROUBLESHOOTING.md)
+[Usage guide](docs/USAGE.md) · [Architecture](docs/ARCHITECTURE.md) ·
+[Choreography](docs/CHOREOGRAPHY.md) · [Troubleshooting](docs/TROUBLESHOOTING.md)
 
 <br>
 
@@ -43,6 +44,7 @@ use), and export back to PowerPoint or self-contained video/GIF slideshows.
 - [Feature tour](#-feature-tour)
 - [Export formats](#-export-formats)
 - [Command-line / headless use](#-command-line--headless-use)
+- [Use it with an AI agent](#-use-it-with-an-ai-agent)
 - [Keyboard shortcuts](#-keyboard-shortcuts)
 - [Project layout](#-project-layout)
 - [How it works](#-how-it-works)
@@ -240,6 +242,29 @@ python -m skull_studio.pipeline sample/demo.pdf
 Individual stages are modules too: `python -m skull_studio.export_pptx`,
 `skull_studio.render_clips`, `skull_studio.build_baked` (via `node`), etc. See
 [docs/USAGE.md](docs/USAGE.md).
+
+## 🤖 Use it with an AI agent
+
+Skull Studio ships **Claude Code skills** so an agent can install it and drive the
+whole pipeline for you — "turn this PDF into an animated deck", "make the logo
+breathe and add falling snow", "export it to PowerPoint with the animations baked in".
+
+```
+/plugin marketplace add TriasJ/skull-studio
+/plugin install skull-studio
+```
+
+Or copy `.claude/skills/*` into your own `~/.claude/skills/`.
+
+| Skill | What it covers |
+|---|---|
+| `skull-studio-install` | prerequisites, install, verification (`doctor.py` reports exactly what's missing and how to fix it) |
+| `skull-studio-pipeline` | import → build → export, headlessly; every CLI flag, plus the studio's HTTP task API |
+| `skull-studio-manifest` | the creative surface: entrances, idles, particles, rigs, 3D and element boxes, edited as JSON — with a cookbook script and a machine-readable manifest schema |
+
+It works because the whole project state is one document, `work/manifest.json` —
+an agent edits that and re-runs a stage, no GUI needed. Repo-level notes for agents
+live in [`CLAUDE.md`](CLAUDE.md).
 
 ## ⌨️ Keyboard shortcuts
 
