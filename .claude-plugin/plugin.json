@@ -1,0 +1,13 @@
+{
+  "name": "skull-studio",
+  "description": "Install and drive Skull Studio: turn PDF/PPTX decks into animated HTML, editable PowerPoint, or baked video slideshows, entirely headlessly.",
+  "version": "0.1.0",
+  "author": {
+    "name": "Skull Studio",
+    "url": "https://github.com/TriasJ/skull-studio"
+  },
+  "homepage": "https://github.com/TriasJ/skull-studio",
+  "repository": "https://github.com/TriasJ/skull-studio",
+  "license": "MIT",
+  "keywords": ["presentation", "powerpoint", "pptx", "animation", "pixijs", "gsap", "pdf", "3d", "video"]
+}

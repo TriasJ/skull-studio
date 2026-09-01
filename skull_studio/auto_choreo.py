@@ -2,8 +2,13 @@
 
 Gives every deck a tasteful default: titles fade up, body text cascades in
 reading order, images mask-reveal from their side and breathe, tiny corner
-marks stay static, backgrounds get a slow ken burns. A per-deck script (see
-choreograph.py) or the in-HTML editor can refine afterwards.
+marks stay static, backgrounds get a slow ken burns.
+
+What these defaults are aiming at, and the rules for extending them, are in
+docs/CHOREOGRAPHY.md. Refine afterwards with the in-HTML editor or the
+manifest-editing tools (`apply-preset`, `set-idle`, `add-particles`); a per-deck
+choreograph.py script remains a valid fallback for decks that need bespoke
+handling, but is not required and is not shipped.
 
 Usage: python -m skull_studio.auto_choreo
 """
