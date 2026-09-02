@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "skull-studio"
-version = "0.1.0"
+version = "0.2.0"
 description = "Turn PDF/PPTX slide decks into interactive animated HTML (PixiJS + GSAP), with an in-browser editor, mesh/2D-bone rigging, and PPTX / video export."
 readme = "README.md"
 requires-python = ">=3.10"

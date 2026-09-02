@@ -5,6 +5,39 @@ loose [semantic versioning](https://semver.org/) while pre-1.0.
 
 ## [Unreleased]
 
+## [0.2.0] — 2026-09-02
+
+### Agent skills & plugin
+- Three **Claude Code skills** under `.claude/skills/`, published as a plugin from
+  this repo (`.claude-plugin/marketplace.json`), so an agent can install Skull Studio
+  and drive the whole pipeline without the GUI:
+  `/plugin marketplace add TriasJ/skull-studio` then `/plugin install skull-studio`.
+  - **`skull-studio-install`** — prerequisite matrix, install paths, and a
+    `doctor.py` that runs 13 checks and prints a per-platform fix for each failure.
+  - **`skull-studio-pipeline`** — import → build → export headlessly: every CLI flag,
+    the studio HTTP task API, and an `ss_task.py` client (port discovery, streamed job
+    logs, manifest get/put honouring the `x-manifest-rev` optimistic lock).
+  - **`skull-studio-manifest`** — the creative surface as JSON: full schema,
+    per-effect parameter tables, rig and `model3d` semantics, and a `manifest_edit.py`
+    cookbook CLI (`set-entrance`, `set-idle`, `add-particles`, `apply-preset`,
+    `add-3d`, `add-element`, `hide`, `bg-idle`, …) that re-runs the project validator
+    after every write.
+- **`manifest.schema.json`** — a machine-readable mirror of `validate_manifest.py`
+  (structural rules, enums and the ease whitelist), usable with the already-declared
+  `jsonschema` dependency.
+- **`CLAUDE.md`** — repo-level notes for agents working *on* the project.
+
+### Choreography design note
+- **`docs/CHOREOGRAPHY.md`** — the first written statement of what the default motion
+  is *for*: stills from scientific and artistic **NotebookLM** decks. Establishes the
+  **information-vs-atmosphere** rule (never mesh-deform data — `wave`/`ripple`/
+  `swirl`/`meshWave` and rigs change what a chart or labelled figure asserts), records
+  that defaults **lean generous** because turning motion off is one edit while setting
+  it up is the job, and treats **MinerU layout output as the segmentation of record**.
+- `auto_choreo.py`'s docstring referred to a per-deck `choreograph.py` that has never
+  existed in any commit; it now points at `docs/CHOREOGRAPHY.md` and describes such a
+  script as an optional fallback rather than the intended path.
+
 ### Feature-showcase deck
 - New `make_showcase.py` generates a 4-slide deck that demonstrates **everything the
   runtime can do**, ready to build/edit/export:
