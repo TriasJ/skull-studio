@@ -105,6 +105,10 @@ idle loops, particles and live 3D models — then open the editor or **Build** i
 > `uv run skull-studio` work too, and `uv` makes the optional MinerU install
 > cleaner.
 
+> **Using Claude Code?** `/plugin marketplace add TriasJ/skull-studio` then
+> `/plugin install skull-studio` — it can install the tool and drive the whole
+> pipeline for you. See [Use it with an AI agent](#-use-it-with-an-ai-agent).
+
 ## 📦 Requirements
 
 | Requirement | Required? | What it's for | Install |
@@ -265,6 +269,10 @@ Or copy `.claude/skills/*` into your own `~/.claude/skills/`.
 It works because the whole project state is one document, `work/manifest.json` —
 an agent edits that and re-runs a stage, no GUI needed. Repo-level notes for agents
 live in [`CLAUDE.md`](CLAUDE.md).
+
+What the defaults are *aiming* at — animating stills from scientific and artistic
+NotebookLM decks, and the rules that follow from it — is written down in
+[docs/CHOREOGRAPHY.md](docs/CHOREOGRAPHY.md).
 
 ## ⌨️ Keyboard shortcuts
 

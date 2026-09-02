@@ -6,14 +6,14 @@
   },
   "metadata": {
     "description": "Agent skills for Skull Studio - animated slide decks from PDF/PPTX",
-    "version": "0.1.0"
+    "version": "0.2.0"
   },
   "plugins": [
     {
       "name": "skull-studio",
       "source": "./",
       "description": "Install and drive Skull Studio headlessly: import a PDF/PPTX deck, choreograph entrances, idle loops, particles, mesh rigs and 3D models by editing manifest.json, then export animated HTML, editable PowerPoint, or a baked video slideshow.",
-      "version": "0.1.0",
+      "version": "0.2.0",
       "author": { "name": "Skull Studio" },
       "category": "productivity",
       "keywords": ["presentation", "powerpoint", "pptx", "animation", "pdf", "pixijs", "gsap", "3d", "video"],
